@@ -1,0 +1,103 @@
+# Software Factory (`software-factory`)
+
+A lightweight, Directed Acyclic Graph (DAG) suite of agentic skills for building software through staged, human-validated phases without schema bloat or context drift.
+
+## Core Design Principles
+
+1. **80/20 Hybrid Artifact (Dual-Format):** Every pipeline skill produces a single markdown artifact made of ~80% human-readable narrative (for review and discussion) and ~20% machine-readable strict JSON inside a trailing `<system_state>...</system_state>` block.
+2. **Strict `<system_state>` Handoff:** Downstream skills ingest upstream `<system_state>` blocks as hard ground truth. If a requirement or constraint is not in upstream state (or if required upstream state is missing), downstream skills pause rather than inventing requirements.
+3. **Universal Adversarial Reviewer (`sf-review`):** One parameterized Red Team skill audits any downstream Target artifact against one or more upstream Source artifacts, checking for constraint violations, scope creep, missing logic, and `<system_state>` validity/parity.
+
+> **Zero Idle Token Overhead:** This plugin intentionally omits always-on rule files (`rules/AGENTS.md` / `GEMINI.md`). Only skill names and descriptions load into the router until you activate a stage.
+
+## Pipeline DAG
+
+```mermaid
+flowchart LR
+    V["1. sf-vision\n01-vision.md"] --> MR["2. sf-market-research\n02-market-research.md"]
+    V --> BRD["3. sf-brd\n03-brd.md"]
+    MR --> BRD
+    V --> PRD["4. sf-prd\n04-prd.md"]
+    BRD --> PRD
+    V --> UX["5. sf-ux\n05-ux.md"]
+    PRD --> UX
+    V --> UI["6. sf-ui\n06-ui.md"]
+    UX --> UI
+    V --> ARCH["7. sf-architecture\n07-architecture.md"]
+    BRD -. "recommended" .-> ARCH
+    PRD --> ARCH
+    UX --> ARCH
+    UI --> ARCH
+    V --> SPECS["8. sf-specs\n08-specs.md"]
+    PRD --> SPECS
+    ARCH --> SPECS
+    REV(["sf-review\nRed Team Audit Gate"]) -. "audits any Source vs Target" .-> ARCH
+```
+
+## Skill Reference
+
+| Skill | Phase | Required Upstream Inputs | `<system_state>` Outputs | Recommended Artifact Path |
+| :--- | :--- | :--- | :--- | :--- |
+| `sf-vision` | `vision` | Initial idea + constraints | `project_name`, `primary_user`, `ux_tone`, `hard_constraints`, `explicitly_out_of_scope` | `docs/factory/01-vision.md` |
+| `sf-market-research` | `market-research` | `sf-vision` | `competitors`, `market_gap_defined`, `validation_status`, `identified_risks` | `docs/factory/02-market-research.md` |
+| `sf-brd` | `brd` | `sf-vision`, `sf-market-research` | `monetization_model`, `core_kpis`, `compliance_requirements`, `budget_or_timeline_constraints` | `docs/factory/03-brd.md` |
+| `sf-prd` | `prd` | `sf-vision`, `sf-brd` | `core_flows`, `business_rules`, `required_integrations`, `edge_case_mitigations` | `docs/factory/04-prd.md` |
+| `sf-ux` | `ux` | `sf-prd`, `sf-vision` | `screens_required`, `primary_navigation_pattern`, `key_interactions`, `accessibility_requirements` | `docs/factory/05-ux.md` |
+| `sf-ui` | `ui` | `sf-vision`, `sf-ux` | `css_framework_recommendation`, `color_palette`, `typography`, `border_radius_base` | `docs/factory/06-ui.md` |
+| `sf-architecture` | `architecture` | `sf-prd`, `sf-ux`, `sf-ui`, `sf-vision` (`sf-brd` strongly recommended) | `frontend_stack`, `backend_stack`, `database_type`, `data_models`, `core_endpoints` | `docs/factory/07-architecture.md` |
+| `sf-specs` | `specs` | `sf-prd`, `sf-architecture`, `sf-vision` | `openapi_stubs`, `required_unit_tests`, `required_e2e_tests`, `linter_rules` | `docs/factory/08-specs.md` |
+| `sf-review` | `review` | 1+ upstream Source artifact(s) + 1 Target artifact | `source_phases`, `target_phase`, `verdict`, `critical_violations_count`, `scope_creep_warnings_count`, `blocking_issues` | `docs/factory/reviews/<source>-vs-<target>-review.md` |
+
+## Installation & Versioning
+
+### Antigravity
+
+Validate and install locally or from a versioned Git tag:
+
+```bash
+# Validate the plugin bundle
+agy plugin validate --strict /path/to/software-factory-plugin
+
+# Install from a local checkout
+agy plugin install /path/to/software-factory-plugin
+
+# Or install a pinned version from GitHub
+agy plugin install https://github.com/jamesconant/software-factory-plugin/tree/v0.1.0
+```
+
+Alternatively, register the local directory in `~/.gemini/config/plugins.json` (global) or `.agents/plugins.json` (workspace):
+
+```json
+{
+  "entries": [
+    { "path": "/path/to/software-factory-plugin" }
+  ]
+}
+```
+
+### Claude Code
+
+Uses `.claude-plugin/plugin.json` together with the shared `skills/` directory at the repository root. Point Claude Code's plugin loader at this repository directory or marketplace entry.
+
+### Gemini CLI
+
+Link the local checkout during development using `gemini-extension.json`:
+
+```bash
+gemini extensions link .
+```
+
+### Releasing a New Version
+
+Keep `version` synchronized across all three manifests before tagging a release:
+1. `plugin.json`
+2. `.claude-plugin/plugin.json`
+3. `gemini-extension.json`
+
+Then commit and push a matching Git tag (for example, `v0.1.0`).
+
+## Roadmap
+
+- **Google Workspace State Management:** Store artifacts in Google Docs/Drive so human comments and revision history act as the shared state database.
+- **Automated Guided Macros:** Chain `<system_state>` extraction across stages automatically, pausing only for human approval before triggering the next skill.
+- **Zero-Touch Execution (`/swarm` + `/goal`):** Feed `sf-specs` directly into a multi-agent Antigravity Swarm running under `/goal` until all generated contracts, tests, and lint rules pass.

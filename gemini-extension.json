@@ -1,0 +1,5 @@
+{
+  "name": "software-factory",
+  "version": "0.1.0",
+  "description": "Lightweight DAG-based software factory pipeline (Vision, Market Research, BRD, PRD, UX, UI, Architecture, Agentic TDD Specs, and Adversarial Red Team Review) using 80/20 hybrid artifacts and strict <system_state> handoffs."
+}
