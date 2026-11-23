@@ -23,11 +23,15 @@ flowchart LR
     PRD --> UX
     V --> UI["6. sf-ui\n06-ui.md"]
     UX --> UI
+    UX -. "optional wireframe" .-> MOCK["6b. sf-mockery (Optional)\n06b-mockery.md + mockups/"]
+    UI -. "optional styled" .-> MOCK
+    V -.-> MOCK
     V --> ARCH["7. sf-architecture\n07-architecture.md"]
     BRD -. "recommended" .-> ARCH
     PRD --> ARCH
     UX --> ARCH
     UI --> ARCH
+    MOCK -. "optional" .-> ARCH
     V --> SPECS["8. sf-specs\n08-specs.md"]
     PRD --> SPECS
     ARCH --> SPECS
@@ -44,9 +48,26 @@ flowchart LR
 | `sf-prd` | `prd` | `sf-vision`, `sf-brd` | `core_flows`, `business_rules`, `required_integrations`, `edge_case_mitigations` | `docs/factory/04-prd.md` |
 | `sf-ux` | `ux` | `sf-prd`, `sf-vision` | `screens_required`, `primary_navigation_pattern`, `key_interactions`, `accessibility_requirements` | `docs/factory/05-ux.md` |
 | `sf-ui` | `ui` | `sf-vision`, `sf-ux` | `css_framework_recommendation`, `color_palette`, `typography`, `border_radius_base` | `docs/factory/06-ui.md` |
-| `sf-architecture` | `architecture` | `sf-prd`, `sf-ux`, `sf-ui`, `sf-vision` (`sf-brd` strongly recommended) | `frontend_stack`, `backend_stack`, `database_type`, `data_models`, `core_endpoints` | `docs/factory/07-architecture.md` |
+| `sf-mockery` *(optional)* | `mockery` | `sf-vision`, `sf-ux`, `sf-ui` (`sf-ui` optional in wireframe mode) | `fidelity`, `mockups_dir`, `devices`, `sections`, `screens`, `components`, `edges_count`, `tokens_synced_from_ui` | `docs/factory/06b-mockery.md` + `docs/factory/mockups/` |
+| `sf-architecture` | `architecture` | `sf-prd`, `sf-ux`, `sf-ui`, `sf-vision` (`sf-brd` recommended; `sf-mockery` optional) | `frontend_stack`, `backend_stack`, `database_type`, `data_models`, `core_endpoints` | `docs/factory/07-architecture.md` |
 | `sf-specs` | `specs` | `sf-prd`, `sf-architecture`, `sf-vision` | `openapi_stubs`, `required_unit_tests`, `required_e2e_tests`, `linter_rules` | `docs/factory/08-specs.md` |
 | `sf-review` | `review` | 1+ upstream Source artifact(s) + 1 Target artifact | `source_phases`, `target_phase`, `verdict`, `critical_violations_count`, `scope_creep_warnings_count`, `blocking_issues` | `docs/factory/reviews/<source>-vs-<target>-review.md` |
+
+## Optional Interactive Mockups (`sf-mockery`)
+
+Between UX/UI and Architecture, you can optionally invoke `sf-mockery` to generate a clickable, pannable **Mockery** flow canvas under `docs/factory/mockups/` (`flow.json`, static HTML screens, reusable `<x-include>` partials, `tokens.css`, `kit.css`) alongside `docs/factory/06b-mockery.md`:
+
+- **Styled Mode (default, after `sf-ui`):** Maps `sf-ux` screens/transitions and `sf-ui` design tokens directly into `docs/factory/mockups/`.
+- **Wireframe Mode (optional, after `sf-ux`):** Generates neutral grayscale screens so you can inspect flows before `sf-ui`, then restyles `tokens.css` and `kit.css` in place after `sf-ui` completes.
+- **Zero Lock-In & Pure File-Only Fallback:** Baseline `sf-ux` → `sf-ui` → `sf-architecture` works identically without Mockery installed. When Mockery is installed in your project, preview and validate the canvas locally:
+
+```bash
+# Validate flow.json, screens, components, edges, and static lints (Mockery v0.3.0+)
+npx mockery check docs/factory/mockups
+
+# Start the live hot-reload flow canvas viewer (auto-detects docs/factory/mockups on v0.3.0+)
+npx mockery docs/factory/mockups
+```
 
 ## Installation & Versioning
 
@@ -100,7 +121,7 @@ Then commit and push a matching Git tag (for example, `v0.1.0`).
 
 Active roadmap planning, design specs, and issue tracking live in [Linear (`SOF`)](https://linear.app/software-factory-plugin):
 
-- **Mockery Integration:** Connect interactive prototyping and visual mockups into the UX/UI pipeline stages.
+- **Mockery Integration (Shipped):** Optional `sf-mockery` bridge skill connecting interactive Mockery flow canvases into UX/UI, `sf-review`, and `sf-architecture`.
 - **Live Project & Tech-Tree View:** Visual DAG/tech-tree view of pipeline stages, artifact status, and review gates.
 - **Agile Sizing & Token/Cost Telemetry:** Fibonacci sizing calibration paired with actual LLM token, cost, and rework tracking.
 - **Prompting Guide & Evals:** End-to-end prompting handbook and automated evaluation suite for skill output quality and `<system_state>` fidelity.
