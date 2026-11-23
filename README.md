@@ -83,7 +83,7 @@ agy plugin validate --strict /path/to/software-factory-plugin
 agy plugin install /path/to/software-factory-plugin
 
 # Or install a pinned version from GitHub
-agy plugin install https://github.com/software-factory-plugin/software-factory-plugin/tree/v0.1.1
+agy plugin install https://github.com/software-factory-plugin/software-factory-plugin/tree/v0.2.0
 ```
 
 Alternatively, register the local directory in `~/.gemini/config/plugins.json` (global) or `.agents/plugins.json` (workspace):
