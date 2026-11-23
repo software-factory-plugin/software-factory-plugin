@@ -63,4 +63,4 @@ Before returning the artifact, run these self-checks:
 3. Zero out-of-scope features, screen/flow mutations, or `hard_constraints` leakage.
 
 - **Save Location:** When working in a workspace/repository, write the generated artifact to `docs/factory/06-ui.md` (creating `docs/factory/` if needed) in addition to returning it in chat; otherwise recommend saving it to `docs/factory/06-ui.md`.
-- **Handoff:** Pause for human review and suggest running `sf-review` against the upstream artifact(s) and this UI spec before advancing to `sf-architecture`. Never auto-advance.
+- **Handoff:** Pause for human review and suggest running `sf-review` against the upstream artifact(s) and this UI spec before advancing to `sf-architecture` (or optionally running `sf-mockery` in styled mode to generate/restyle an interactive flow canvas first). Never auto-advance.
