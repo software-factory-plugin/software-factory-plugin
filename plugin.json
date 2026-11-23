@@ -4,8 +4,8 @@
   "version": "0.1.1",
   "description": "Lightweight DAG-based software factory pipeline (Vision, Market Research, BRD, PRD, UX, UI, Architecture, Agentic TDD Specs, and Adversarial Red Team Review) using 80/20 hybrid artifacts and strict <system_state> handoffs.",
   "author": "jamesconant",
-  "homepage": "https://github.com/jamesconant/software-factory-plugin",
-  "repository": "https://github.com/jamesconant/software-factory-plugin",
+  "homepage": "https://github.com/software-factory-plugin/software-factory-plugin",
+  "repository": "https://github.com/software-factory-plugin/software-factory-plugin",
   "suggestedPrompts": [
     "Start a new Software Factory project with a Product Vision & Charter",
     "Run a Red Team adversarial review comparing my PRD against my System Architecture",

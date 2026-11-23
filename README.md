@@ -62,7 +62,7 @@ agy plugin validate --strict /path/to/software-factory-plugin
 agy plugin install /path/to/software-factory-plugin
 
 # Or install a pinned version from GitHub
-agy plugin install https://github.com/jamesconant/software-factory-plugin/tree/v0.1.1
+agy plugin install https://github.com/software-factory-plugin/software-factory-plugin/tree/v0.1.1
 ```
 
 Alternatively, register the local directory in `~/.gemini/config/plugins.json` (global) or `.agents/plugins.json` (workspace):
@@ -98,6 +98,10 @@ Then commit and push a matching Git tag (for example, `v0.1.0`).
 
 ## Roadmap
 
-- **Google Workspace State Management:** Store artifacts in Google Docs/Drive so human comments and revision history act as the shared state database.
-- **Automated Guided Macros:** Chain `<system_state>` extraction across stages automatically, pausing only for human approval before triggering the next skill.
-- **Zero-Touch Execution (`/swarm` + `/goal`):** Feed `sf-specs` directly into a multi-agent Antigravity Swarm running under `/goal` until all generated contracts, tests, and lint rules pass.
+Active roadmap planning, design specs, and issue tracking live in [Linear (`SOF`)](https://linear.app/software-factory-plugin):
+
+- **Mockery Integration:** Connect interactive prototyping and visual mockups into the UX/UI pipeline stages.
+- **Live Project & Tech-Tree View:** Visual DAG/tech-tree view of pipeline stages, artifact status, and review gates.
+- **Agile Sizing & Token/Cost Telemetry:** Fibonacci sizing calibration paired with actual LLM token, cost, and rework tracking.
+- **Prompting Guide & Evals:** End-to-end prompting handbook and automated evaluation suite for skill output quality and `<system_state>` fidelity.
+- **Marketplace Publishing:** Packaging, validation, and distribution across Antigravity, Claude Code, and Gemini CLI marketplaces.
