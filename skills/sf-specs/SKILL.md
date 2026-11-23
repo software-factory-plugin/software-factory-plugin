@@ -16,6 +16,7 @@ description: >-
   - `sf-prd` `<system_state>`: `core_flows`, `business_rules`, `edge_case_mitigations`
   - `sf-architecture` `<system_state>`: `frontend_stack`, `backend_stack`, `database_type`, `data_models`, `core_endpoints`
   - `sf-vision` `<system_state>`: `hard_constraints`, `explicitly_out_of_scope`
+- **Input Resolution Order:** Locate required upstream `<system_state>` blocks in this order before triggering the Missing-Input Guard: (1) files or text explicitly provided in the user prompt, (2) earlier turns in the current conversation, (3) canonical workspace files `docs/factory/01-vision.md`, `docs/factory/04-prd.md`, and `docs/factory/07-architecture.md` (plus `docs/factory/03-brd.md` when present, if working in a repository).
 - **Missing-Input Guard:** If any required upstream `<system_state>` block is missing or contains invalid JSON, STOP immediately and ask the user to provide it (or offer to run the missing upstream skill first). Never guess or invent upstream requirements.
 - **Strict Constraint Inheritance:** All API contracts, test cases, and guardrails MUST strictly adhere to upstream `hard_constraints` and `explicitly_out_of_scope` (plus `compliance_requirements` and `budget_or_timeline_constraints` when present).
 - **Stage Boundaries & Gates:**
@@ -64,5 +65,5 @@ Place strict, valid JSON directly inside `<system_state>...</system_state>` (no 
   1. Confirm `<system_state>` contains strict, valid JSON with `"phase": "specs"` and all required keys (`openapi_stubs`, `required_unit_tests`, `required_e2e_tests`, `linter_rules`) and no code fences, comments, or trailing commas.
   2. Confirm narrative-to-state parity across `### 1. API Contracts`, `### 2. Test Suite Definition`, and `### 3. Execution Guardrails`, with every endpoint traced directly to `sf-architecture` `core_endpoints`.
   3. Confirm zero `explicitly_out_of_scope` additions, zero violations of `hard_constraints` or `compliance_requirements`, and zero application implementation code.
-- **Repository Output:** Recommend saving the generated artifact to `docs/factory/08-specs.md` when working in a repository.
+- **Repository Output:** When working in a workspace/repository, write the generated artifact to `docs/factory/08-specs.md` (creating `docs/factory/` if needed) in addition to returning it in chat; otherwise recommend saving it to `docs/factory/08-specs.md`.
 - **Handoff:** Pause for human review and never auto-advance. Suggest running `sf-review` against `sf-prd` + `sf-architecture` before handing off to implementation (e.g., Swarm / TDD execution).

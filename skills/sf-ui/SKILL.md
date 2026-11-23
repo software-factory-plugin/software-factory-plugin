@@ -15,6 +15,7 @@ description: >-
 - **Required Inputs:**
   - `sf-vision` `<system_state>`: `ux_tone`, `hard_constraints`, `explicitly_out_of_scope` (plus `compliance_requirements` and `budget_or_timeline_constraints` when present).
   - `sf-ux` `<system_state>`: `screens_required`, `primary_navigation_pattern`, `key_interactions`, `accessibility_requirements`.
+- **Input Resolution Order:** Locate required upstream `<system_state>` blocks in this order before triggering the Missing-Input Guard: (1) files or text explicitly provided in the user prompt, (2) earlier turns in the current conversation, (3) canonical workspace files `docs/factory/01-vision.md` and `docs/factory/05-ux.md` (plus `docs/factory/03-brd.md` when present, if working in a repository).
 - **Missing-Input Guard:** If either required upstream `<system_state>` block is missing or contains invalid JSON, STOP immediately and ask the user to provide it (or offer to run `sf-vision` / `sf-ux` first). Never guess or invent upstream requirements.
 - **Strict Constraint Inheritance:** Adhere strictly to upstream `hard_constraints` and `explicitly_out_of_scope` (as well as `compliance_requirements` and `budget_or_timeline_constraints` when present). Do not introduce out-of-scope features, unapproved libraries, or prohibited visual complexity.
 - **Stage Boundaries & Gates:** Define CSS/Tailwind-compatible design tokens and component styling aligned with `ux_tone`. Verify color contrast and focus/interaction styling meet `accessibility_requirements`. Do NOT add/remove screens or alter UX flows.
@@ -61,5 +62,5 @@ Before returning the artifact, run these self-checks:
 2. Narrative sections and `<system_state>` tokens match verbatim (100% narrative/state parity).
 3. Zero out-of-scope features, screen/flow mutations, or `hard_constraints` leakage.
 
-- **Save Location:** Recommend saving the generated artifact to `docs/factory/06-ui.md` when working in a repository.
+- **Save Location:** When working in a workspace/repository, write the generated artifact to `docs/factory/06-ui.md` (creating `docs/factory/` if needed) in addition to returning it in chat; otherwise recommend saving it to `docs/factory/06-ui.md`.
 - **Handoff:** Pause for human review and suggest running `sf-review` against the upstream artifact(s) and this UI spec before advancing to `sf-architecture`. Never auto-advance.

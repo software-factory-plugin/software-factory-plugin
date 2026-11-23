@@ -16,6 +16,7 @@ Translate the PRD into structural user flows, navigation hierarchy, and screen l
   - `sf-prd` `<system_state>`: `core_flows`, `business_rules`, `edge_case_mitigations`.
   - `sf-vision` `<system_state>`: `primary_user`, `hard_constraints`, `explicitly_out_of_scope`.
   - Optional upstream constraints (inherit whenever present): `compliance_requirements`, `budget_or_timeline_constraints`.
+- **Input Resolution Order:** Locate required upstream `<system_state>` blocks in this order before triggering the Missing-Input Guard: (1) files or text explicitly provided in the user prompt, (2) earlier turns in the current conversation, (3) canonical workspace files `docs/factory/01-vision.md` and `docs/factory/04-prd.md` (plus `docs/factory/03-brd.md` when present, if working in a repository).
 - **Missing-Input Guard:** If any required upstream `<system_state>` block is missing or contains invalid JSON, STOP immediately and ask the user to provide it (or offer to run `sf-vision` / `sf-prd` first). Never guess or invent upstream requirements.
 - **Strict Constraint Inheritance:** Every screen, navigation path, and interaction must strictly honor upstream `hard_constraints` and `explicitly_out_of_scope` (plus `compliance_requirements` and `budget_or_timeline_constraints` when present).
 - **Stage Boundaries & Gates:** Focus strictly on usability, friction reduction, information architecture, structural ASCII/descriptive wireframes, interaction behaviors, and accessibility requirements. Do NOT select colors, typography, or CSS frameworks (leave to `sf-ui`), and do NOT invent features absent from the PRD.
@@ -62,4 +63,4 @@ Before returning the artifact, perform these self-checks:
 - **Narrative/State Parity:** Confirm `screens_required`, `primary_navigation_pattern`, `key_interactions`, and `accessibility_requirements` match the three narrative sections.
 - **Zero Leakage:** Confirm zero `explicitly_out_of_scope` features, zero `hard_constraints` violations, and zero visual design decisions (colors, fonts, CSS frameworks).
 
-Recommend saving the generated artifact to `docs/factory/05-ux.md` when working in a repository. Pause for human review and suggest running `sf-review` against upstream artifact(s) before advancing to `sf-ui`—never auto-advance.
+When working in a workspace/repository, write the generated artifact to `docs/factory/05-ux.md` (creating `docs/factory/` if needed) in addition to returning it in chat; otherwise recommend saving it to `docs/factory/05-ux.md`. Pause for human review and suggest running `sf-review` against upstream artifact(s) before advancing to `sf-ui`—never auto-advance.

@@ -5,7 +5,7 @@ A lightweight, Directed Acyclic Graph (DAG) suite of agentic skills for building
 ## Core Design Principles
 
 1. **80/20 Hybrid Artifact (Dual-Format):** Every pipeline skill produces a single markdown artifact made of ~80% human-readable narrative (for review and discussion) and ~20% machine-readable strict JSON inside a trailing `<system_state>...</system_state>` block.
-2. **Strict `<system_state>` Handoff:** Downstream skills ingest upstream `<system_state>` blocks as hard ground truth. If a requirement or constraint is not in upstream state (or if required upstream state is missing), downstream skills pause rather than inventing requirements.
+2. **Strict `<system_state>` Handoff:** Downstream skills ingest upstream `<system_state>` blocks as hard ground truth. When working in a workspace, each stage writes its artifact under `docs/factory/` and downstream skills check explicit prompt inputs, current conversation turns, and `docs/factory/` in order before triggering the Missing-Input Guard; if required upstream state is still missing, downstream skills pause rather than inventing requirements.
 3. **Universal Adversarial Reviewer (`sf-review`):** One parameterized Red Team skill audits any downstream Target artifact against one or more upstream Source artifacts, checking for constraint violations, scope creep, missing logic, and `<system_state>` validity/parity.
 
 > **Zero Idle Token Overhead:** This plugin intentionally omits always-on rule files (`rules/AGENTS.md` / `GEMINI.md`). Only skill names and descriptions load into the router until you activate a stage.
@@ -36,7 +36,7 @@ flowchart LR
 
 ## Skill Reference
 
-| Skill | Phase | Required Upstream Inputs | `<system_state>` Outputs | Recommended Artifact Path |
+| Skill | Phase | Required Upstream Inputs | `<system_state>` Outputs | Canonical Artifact Path |
 | :--- | :--- | :--- | :--- | :--- |
 | `sf-vision` | `vision` | Initial idea + constraints | `project_name`, `primary_user`, `ux_tone`, `hard_constraints`, `explicitly_out_of_scope` | `docs/factory/01-vision.md` |
 | `sf-market-research` | `market-research` | `sf-vision` | `competitors`, `market_gap_defined`, `validation_status`, `identified_risks` | `docs/factory/02-market-research.md` |
@@ -62,7 +62,7 @@ agy plugin validate --strict /path/to/software-factory-plugin
 agy plugin install /path/to/software-factory-plugin
 
 # Or install a pinned version from GitHub
-agy plugin install https://github.com/jamesconant/software-factory-plugin/tree/v0.1.0
+agy plugin install https://github.com/jamesconant/software-factory-plugin/tree/v0.1.1
 ```
 
 Alternatively, register the local directory in `~/.gemini/config/plugins.json` (global) or `.agents/plugins.json` (workspace):

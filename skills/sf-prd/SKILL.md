@@ -15,6 +15,7 @@ description: >-
 - **Required Inputs:**
   - `sf-vision` `<system_state>`: `project_name`, `primary_user`, `hard_constraints`, `explicitly_out_of_scope`.
   - `sf-brd` `<system_state>`: `monetization_model`, `core_kpis`, `compliance_requirements`, `budget_or_timeline_constraints`.
+- **Input Resolution Order:** Locate required upstream `<system_state>` blocks in this order before triggering the Missing-Input Guard: (1) files or text explicitly provided in the user prompt, (2) earlier turns in the current conversation, (3) canonical workspace files `docs/factory/01-vision.md` and `docs/factory/03-brd.md` (if working in a repository).
 - **Missing-Input Guard:** If any required upstream `<system_state>` block is missing or contains invalid JSON, **STOP** immediately and ask the user to provide it (or offer to run `sf-vision` or `sf-brd` first). Never guess or invent upstream requirements.
 - **Strict Constraint Inheritance:** Strictly enforce upstream `hard_constraints` and `explicitly_out_of_scope` (plus `compliance_requirements` and `budget_or_timeline_constraints` when present). Reject or omit any flow, rule, or integration that violates them.
 - **Stage Boundaries & Gates:**
@@ -66,5 +67,5 @@ Before returning the PRD, verify:
 - Narrative/state parity: every flow, rule, implied integration, and all >=3 edge-case mitigations in the narrative appear in `<system_state>`.
 - Zero leakage: no UI screen designs/wireframes, no database/framework/infrastructure picks, and zero violations of `hard_constraints` or `explicitly_out_of_scope`.
 
-- **Repository Path:** Recommend saving the generated artifact to `docs/factory/04-prd.md` when working in a repository.
+- **Repository Path:** When working in a workspace/repository, write the generated artifact to `docs/factory/04-prd.md` (creating `docs/factory/` if needed) in addition to returning it in chat; otherwise recommend saving it to `docs/factory/04-prd.md`.
 - **Review Gate:** Pause for human review and suggest running `sf-review` against the upstream artifact(s) before advancing to `sf-ux`—never auto-advance.

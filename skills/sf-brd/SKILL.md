@@ -15,6 +15,7 @@ description: >-
 - **Required Inputs:**
   - `sf-vision` `<system_state>`: `project_name`, `primary_user`, `hard_constraints`, `explicitly_out_of_scope`
   - `sf-market-research` `<system_state>`: `competitors`, `market_gap_defined`, `validation_status`, `identified_risks`
+- **Input Resolution Order:** Locate required upstream `<system_state>` blocks in this order before triggering the Missing-Input Guard: (1) files or text explicitly provided in the user prompt, (2) earlier turns in the current conversation, (3) canonical workspace files `docs/factory/01-vision.md` and `docs/factory/02-market-research.md` (if working in a repository).
 - **Missing-Input Guard:** If any required upstream `<system_state>` block is missing, incomplete, or contains invalid JSON, **STOP** immediately and ask the user to provide it (or offer to run `sf-vision` / `sf-market-research` first). Never guess or invent upstream requirements.
 - **Strict Constraint Inheritance:** Carry forward and enforce all upstream `hard_constraints` and `explicitly_out_of_scope` items (plus `compliance_requirements` and `budget_or_timeline_constraints` when present).
 - **Stage Boundaries & Gate:**
@@ -63,5 +64,5 @@ Place strict, valid JSON directly inside `<system_state>...</system_state>` (no 
   1. `<system_state>` contains strict, valid JSON matching the exact schema keys (`phase: "brd"`, `monetization_model`, `core_kpis`, `compliance_requirements`, `budget_or_timeline_constraints`) with no code fences, comments, or trailing commas.
   2. Narrative sections and `<system_state>` values are in full parity (3-4 KPIs, matching monetization, compliance, and budget/timeline constraints).
   3. Zero out-of-scope features (`explicitly_out_of_scope`), violated `hard_constraints`, or downstream PRD/architecture leakage appear anywhere in the document.
-- **Artifact Location:** Recommend saving the generated BRD to `docs/factory/03-brd.md` when working in a repository.
+- **Artifact Location:** When working in a workspace/repository, write the generated BRD to `docs/factory/03-brd.md` (creating `docs/factory/` if needed) in addition to returning it in chat; otherwise recommend saving it to `docs/factory/03-brd.md`.
 - **Next Step:** Pause for human review and suggest running `sf-review` against the upstream artifact(s) (`sf-vision` / `sf-market-research`) and this BRD before advancing to `sf-prd`. Never auto-advance to the next stage.

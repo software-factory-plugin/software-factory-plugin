@@ -53,5 +53,5 @@ Place strict, valid JSON directly inside `<system_state>...</system_state>` (no 
 ## Validation & Next Step
 
 - **Self-Checks:** Verify `<system_state>` contains strict, valid JSON matching the exact schema above; confirm 1:1 parity between the narrative sections and JSON fields; confirm zero out-of-scope or constraint leakage.
-- **Persistence:** Recommend saving the generated artifact to `docs/factory/01-vision.md` when working in a repository.
+- **Persistence:** When working in a workspace/repository, write the generated artifact to `docs/factory/01-vision.md` (creating `docs/factory/` if needed) in addition to returning it in chat; otherwise recommend saving it to `docs/factory/01-vision.md`.
 - **Handoff Gate:** Pause for human review and suggest running `sf-review` against upstream artifact(s) before advancing to `sf-market-research` (never auto-advance).

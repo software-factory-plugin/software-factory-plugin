@@ -13,6 +13,7 @@ Your job is to ruthlessly critique a downstream Target artifact so it strictly a
 ## Inputs & Handoff Gate
 
 - **Required Inputs:** One or more upstream Source artifacts (each containing `<system_state>`) AND one downstream Target artifact (narrative + `<system_state>`).
+- **Input Resolution Order:** Locate the requested Source and Target artifacts in this order before triggering the Missing-Input Guard: (1) files or text explicitly provided in the user prompt, (2) earlier turns in the current conversation, (3) canonical workspace files under `docs/factory/` (`01-vision.md` through `08-specs.md`, if working in a repository).
 - **Missing-Input Guard:** If the Target artifact is missing, or any required upstream `<system_state>` block is missing or contains invalid JSON, **STOP** immediately and ask the user to provide it (or offer to run the upstream skill first). Never guess or invent upstream requirements.
 - **Strict Constraint Inheritance:** Treat upstream `hard_constraints` and `explicitly_out_of_scope` (plus `compliance_requirements` and `budget_or_timeline_constraints` when present) as non-negotiable project laws.
 - **Stage Boundaries & Gates:** NEVER rewrite the Target document or author new pipeline stages. Run four strict checks and output an audit log with a `PASS` / `FAIL` verdict:
@@ -61,5 +62,5 @@ Place strict, valid JSON directly inside `<system_state>...</system_state>` (no 
 ## Validation & Next Step
 
 - **Self-Check Before Returning:** Confirm `<system_state>` contains strict valid JSON, counts and `verdict`/`blocking_issues` match the audit narrative, and zero Target prose was rewritten or out-of-scope ideas leaked.
-- **Recommended Save Path:** Save the generated review to `docs/factory/reviews/<source>-vs-<target>-review.md` when working in a repository.
+- **Save Path:** When working in a workspace/repository, write the generated review to `docs/factory/reviews/<source>-vs-<target>-review.md` (creating `docs/factory/reviews/` if needed) in addition to returning it in chat; otherwise recommend saving it to `docs/factory/reviews/<source>-vs-<target>-review.md`.
 - **Handoff Rule:** Pause for human review and never auto-advance. If `verdict` is `"PASS"`, proceed to the next pipeline stage; if `"FAIL"`, return blocking findings so the author revises the Target artifact and re-runs `sf-review` against the upstream artifact(s) before advancing.

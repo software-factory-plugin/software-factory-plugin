@@ -18,6 +18,7 @@ Select the simplest, most efficient tech stack, entity-relationship data models,
   - `sf-ui`: `css_framework_recommendation`
   - `sf-vision`: `hard_constraints`, `explicitly_out_of_scope`
   - `sf-brd` *(strongly recommended)*: `compliance_requirements`, `budget_or_timeline_constraints` — warn explicitly if omitted.
+- **Input Resolution Order:** Locate required upstream `<system_state>` blocks in this order before triggering the Missing-Input Guard: (1) files or text explicitly provided in the user prompt, (2) earlier turns in the current conversation, (3) canonical workspace files `docs/factory/01-vision.md`, `docs/factory/04-prd.md`, `docs/factory/05-ux.md`, `docs/factory/06-ui.md`, and (when present) `docs/factory/03-brd.md` (if working in a repository).
 - **Missing-Input Guard:** If any required upstream `<system_state>` block (`sf-prd`, `sf-ux`, `sf-ui`, `sf-vision`) is missing or contains invalid JSON, STOP immediately and ask the user to provide it or offer to run the upstream skill first. Never guess or invent upstream requirements.
 - **Strict Constraint Inheritance:** Every stack, schema, and endpoint decision must obey upstream `hard_constraints` and `explicitly_out_of_scope` (plus `compliance_requirements` and `budget_or_timeline_constraints` when present).
 - **Stage Boundaries & Gates:** Select the simplest frontend, backend, database, ER data models, and `core_endpoints` needed to satisfy upstream constraints without over-engineering. Do NOT write full OpenAPI payload schemas or unit/E2E test suites (leave those to `sf-specs`).
@@ -72,5 +73,5 @@ Place strict, valid JSON directly inside `<system_state>...</system_state>` (no 
   1. `<system_state>` contains strict, valid JSON matching the exact schema keys above (no code fences, comments, or trailing commas).
   2. Full parity exists between the narrative sections and `<system_state>` (`frontend_stack`, `backend_stack`, `database_type`, `data_models`, `core_endpoints`).
   3. Zero `explicitly_out_of_scope` features, `hard_constraints` violations, OpenAPI payload schemas, or unit/E2E test suites leaked into the design.
-- **Repository Output:** When working in a repository, recommend saving this artifact to `docs/factory/07-architecture.md`.
+- **Repository Output:** When working in a workspace/repository, write this artifact to `docs/factory/07-architecture.md` (creating `docs/factory/` if needed) in addition to returning it in chat; otherwise recommend saving it to `docs/factory/07-architecture.md`.
 - **Human Review Gate:** Pause for human review and suggest running `sf-review` against upstream artifact(s) before advancing to `sf-specs`. Never auto-advance to `sf-specs`.
