@@ -18,17 +18,18 @@ Select the simplest, most efficient tech stack, entity-relationship data models,
   - `sf-ui`: `css_framework_recommendation`
   - `sf-vision`: `hard_constraints`, `explicitly_out_of_scope`
   - `sf-brd` *(strongly recommended)*: `compliance_requirements`, `budget_or_timeline_constraints` — warn explicitly if omitted.
-- **Input Resolution Order:** Locate required upstream `<system_state>` blocks in this order before triggering the Missing-Input Guard: (1) files or text explicitly provided in the user prompt, (2) earlier turns in the current conversation, (3) canonical workspace files `docs/factory/01-vision.md`, `docs/factory/04-prd.md`, `docs/factory/05-ux.md`, `docs/factory/06-ui.md`, and (when present) `docs/factory/03-brd.md` (if working in a repository).
-- **Missing-Input Guard:** If any required upstream `<system_state>` block (`sf-prd`, `sf-ux`, `sf-ui`, `sf-vision`) is missing or contains invalid JSON, STOP immediately and ask the user to provide it or offer to run the upstream skill first. Never guess or invent upstream requirements.
+  - `sf-mockery` *(optional)*: `screens`, `components`, `devices`, `fidelity` — ingest when present, never require it.
+- **Input Resolution Order:** Locate required upstream `<system_state>` blocks in this order before triggering the Missing-Input Guard: (1) files or text explicitly provided in the user prompt, (2) earlier turns in the current conversation, (3) canonical workspace files `docs/factory/01-vision.md`, `docs/factory/04-prd.md`, `docs/factory/05-ux.md`, `docs/factory/06-ui.md`, and (when present) `docs/factory/03-brd.md` and `docs/factory/06b-mockery.md` (if working in a repository).
+- **Missing-Input Guard:** If any required upstream `<system_state>` block (`sf-prd`, `sf-ux`, `sf-ui`, `sf-vision`) is missing or contains invalid JSON, STOP immediately and ask the user to provide it or offer to run the upstream skill first. Never guess or invent upstream requirements. Do **not** trigger this guard if optional `sf-mockery` is absent.
 - **Strict Constraint Inheritance:** Every stack, schema, and endpoint decision must obey upstream `hard_constraints` and `explicitly_out_of_scope` (plus `compliance_requirements` and `budget_or_timeline_constraints` when present).
 - **Stage Boundaries & Gates:** Select the simplest frontend, backend, database, ER data models, and `core_endpoints` needed to satisfy upstream constraints without over-engineering. Do NOT write full OpenAPI payload schemas or unit/E2E test suites (leave those to `sf-specs`).
 
 ## Execution Steps
 
-1. **Validate Inputs & Constraints:** Parse required upstream `<system_state>` JSON blocks; trigger the Missing-Input Guard on missing/invalid inputs, warn if `sf-brd` is omitted, and lock in `hard_constraints`, `explicitly_out_of_scope`, compliance, and budget/timeline limits.
-2. **Select Tech Stack:** Choose the simplest frontend (integrating `css_framework_recommendation`), backend, database, hosting, and third-party services (`required_integrations`) fit for `screens_required` and `core_flows`.
+1. **Validate Inputs & Constraints:** Parse required upstream `<system_state>` JSON blocks (plus optional `sf-brd` and `sf-mockery` when present); trigger the Missing-Input Guard on missing/invalid required inputs, warn if `sf-brd` is omitted, and lock in `hard_constraints`, `explicitly_out_of_scope`, compliance, and budget/timeline limits.
+2. **Select Tech Stack:** Choose the simplest frontend (integrating `css_framework_recommendation`, and aligning with `sf-mockery` `devices` and shared `components` when present), backend, database, hosting, and third-party services (`required_integrations`) fit for `screens_required` and `core_flows`.
 3. **Design Database Schema:** Define ER entities, typed fields/columns, keys, and relationships supporting `business_rules` and `edge_case_mitigations`.
-4. **Define API & State Boundaries:** Map frontend-to-backend communication, client/server state boundaries, and `core_endpoints` (`method`, `path`, `purpose`) for `key_interactions` and `core_flows`—stopping short of full OpenAPI payloads or test suites.
+4. **Define API & State Boundaries:** Map frontend-to-backend communication, client/server state boundaries (incorporating concrete `sf-mockery` screen IDs and `empty`/`loading`/`error` state variants when present), and `core_endpoints` (`method`, `path`, `purpose`) for `key_interactions` and `core_flows`—stopping short of full OpenAPI payloads or test suites.
 
 ## Output Format (80/20 Hybrid Artifact)
 
