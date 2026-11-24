@@ -110,6 +110,18 @@ npx mockery check docs/factory/mockups
 npx mockery docs/factory/mockups
 ```
 
+## Prompting Guide & Automated Evals
+
+- **Operator Prompting Guide:** See [`docs/PROMPTING_GUIDE.md`](docs/PROMPTING_GUIDE.md) for copy-paste starter prompts across all 12 skills, high-signal vs. anti-pattern prompt comparisons, recovery playbooks (Missing-Input Guard, `sf-review FAIL`, stale blast radius, 8-pt epic splits), and cross-harness tips.
+- **Zero-Dependency Eval Suite (`evals/run.mjs`):** Deterministically audits all 12 skills, golden end-to-end PulseBoard `<system_state>` schemas + negative defect cases, Missing-Input Guard & `sf-review` coverage, and idle router token budgets (CI-enforced via `.github/workflows/ci.yml`):
+
+```bash
+# Run all 4 eval suites (skills, schemas, guards, tokens) offline with Node 20+
+node evals/run.mjs --ascii
+node evals/run.mjs --markdown
+node evals/run.mjs --json
+```
+
 ## Installation & Versioning
 
 ### Antigravity
@@ -165,5 +177,5 @@ Active roadmap planning, design specs, and issue tracking live in [Linear (`SOF`
 - **Mockery Integration (Shipped):** Optional `sf-mockery` bridge skill connecting interactive Mockery flow canvases into UX/UI, `sf-review`, and `sf-architecture`.
 - **Live Project & Tech-Tree View (Shipped):** Dual-mode read-only `sf-tree` skill and zero-dep Node 20+ DAG analyzer/live SSE web viewer covering both Work-Item / Linear Dependency Tech-Trees (topological tiers, ready vs. blocked work, Critical Path) and 01–08 Pipeline Stages (staleness blast radius, `sf-review` gates, Mockery parity).
 - **Agile Sizing & Token/Cost Telemetry (Shipped):** On-demand `sf-telemetry` skill and zero-dep Node 20+ CLI pairing Fibonacci sizing (`1, 2, 3, 5, 8`) with offline token/cost pricing, Linear bootstrap & transcript parsers, out-of-repo JSONL storage, and calibration/blowup reports.
-- **Prompting Guide & Evals:** End-to-end prompting handbook and automated evaluation suite for skill output quality and `<system_state>` fidelity.
+- **Prompting Guide & Evals (Shipped):** Comprehensive operator handbook (`docs/PROMPTING_GUIDE.md`) plus zero-dep Node 20+ automated eval suite (`evals/run.mjs`, golden PulseBoard fixtures, 4 suites, GitHub Actions CI) verifying frontmatter, `<system_state>` fidelity, Missing-Input Guards, `sf-review` vectors, and idle-router token budgets.
 - **Marketplace Publishing:** Packaging, validation, and distribution across Antigravity, Claude Code, and Gemini CLI marketplaces.
