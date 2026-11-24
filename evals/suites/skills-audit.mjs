@@ -71,10 +71,11 @@ export function runSkillsAudit(repoRoot) {
     );
   }
 
-  // 2. Manifest version & name parity across all 3 manifests
+  // 2. Manifest version & name parity across all 4 harness manifests + 2 marketplace catalogs
   const manifestRelPaths = [
     "plugin.json",
     ".claude-plugin/plugin.json",
+    ".codex-plugin/plugin.json",
     "gemini-extension.json",
   ];
   const manifests = [];
@@ -90,13 +91,40 @@ export function runSkillsAudit(repoRoot) {
     manifests.push({ rel, data: parsed });
   }
 
-  const versions = new Set(manifests.map((m) => m.data?.version).filter(Boolean));
+  const marketplaceRelPaths = [
+    ".claude-plugin/marketplace.json",
+    ".agents/plugins/marketplace.json",
+  ];
+  const marketplaceVersions = [];
+  for (const rel of marketplaceRelPaths) {
+    const full = path.join(repoRoot, rel);
+    try {
+      const parsed = JSON.parse(fs.readFileSync(full, "utf8"));
+      const entry = Array.isArray(parsed.plugins)
+        ? parsed.plugins.find((p) => p?.name === "software-factory")
+        : null;
+      add(
+        `marketplace-json:${rel}`,
+        Boolean(entry && entry.version),
+        entry ? `Valid marketplace entry (v${entry.version})` : "Missing software-factory plugin entry"
+      );
+      if (entry?.version) marketplaceVersions.push(entry.version);
+    } catch (err) {
+      add(`marketplace-json:${rel}`, false, `Invalid JSON: ${err.message}`);
+    }
+  }
+
+  const versions = new Set(
+    [...manifests.map((m) => m.data?.version), ...marketplaceVersions].filter(Boolean)
+  );
   const names = new Set(manifests.map((m) => m.data?.name).filter(Boolean));
   add(
     "manifest-version-sync",
-    versions.size === 1 && manifests.every((m) => Boolean(m.data?.version)),
+    versions.size === 1 &&
+      manifests.every((m) => Boolean(m.data?.version)) &&
+      marketplaceVersions.length === marketplaceRelPaths.length,
     versions.size === 1
-      ? `All 3 manifests synced at v${[...versions][0]}`
+      ? `All 6 plugin/marketplace manifests synced at v${[...versions][0]}`
       : `Version drift detected: ${[...versions].join(", ")}`
   );
   add(

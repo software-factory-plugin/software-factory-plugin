@@ -140,7 +140,7 @@ agy plugin validate --strict /path/to/software-factory-plugin
 agy plugin install /path/to/software-factory-plugin
 
 # Or install a pinned version from GitHub
-agy plugin install https://github.com/software-factory-plugin/software-factory-plugin/tree/v0.7.0
+agy plugin install https://github.com/software-factory-plugin/software-factory-plugin/tree/v0.7.1
 ```
 
 Alternatively, register the local directory in `~/.gemini/config/plugins.json` (global) or `.agents/plugins.json` (workspace):
@@ -155,7 +155,16 @@ Alternatively, register the local directory in `~/.gemini/config/plugins.json` (
 
 ### Claude Code
 
-Uses `.claude-plugin/plugin.json` together with the shared `skills/` directory at the repository root. Point Claude Code's plugin loader at this repository directory or marketplace entry.
+Uses `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` together with the shared `skills/` directory at the repository root. Install directly from GitHub via Claude Code's marketplace loader:
+
+```text
+/plugin marketplace add software-factory-plugin/software-factory-plugin
+/plugin install software-factory@software-factory-marketplace
+```
+
+### OpenAI Codex
+
+Uses `.codex-plugin/plugin.json` (`"skills": "./skills/"`) and `.agents/plugins/marketplace.json` together with the shared `skills/` directory at the repository root. Point Codex's `/plugins` marketplace loader at `software-factory-plugin/software-factory-plugin` (or add the repository as a marketplace source).
 
 ### Gemini CLI
 
@@ -167,11 +176,11 @@ gemini extensions link .
 
 ### Releasing a New Version
 
-Keep `version` synchronized across all three manifests and `README.md` using the bundled zero-dependency sync helper before tagging:
+Keep `version` synchronized across all plugin and marketplace manifests (`plugin.json`, `.claude-plugin/*`, `.codex-plugin/*`, `.agents/plugins/marketplace.json`, `gemini-extension.json`) and `README.md` using the bundled zero-dependency sync helper before tagging:
 
 ```bash
-# Sync plugin.json, .claude-plugin/plugin.json, gemini-extension.json, and README.md
-node scripts/bump-version.mjs 0.7.0
+# Sync all 6 plugin/marketplace manifests and README.md
+node scripts/bump-version.mjs 0.7.1
 
 # Verify version parity, evals, and strict plugin validation
 node scripts/bump-version.mjs --check
@@ -179,7 +188,7 @@ node evals/run.mjs --ascii
 agy plugin validate --strict .
 ```
 
-Then commit and push a matching annotated Git tag and GitHub Release (for example, `v0.7.0`).
+Then commit and push a matching annotated Git tag and GitHub Release (for example, `v0.7.1`).
 
 ## Roadmap
 
@@ -189,7 +198,7 @@ Active roadmap planning, design specs, and issue tracking live in [Linear (`SOF`
 - **Live Project & Tech-Tree View (Shipped — `v0.3.0` / `v0.4.0`):** Dual-mode read-only `sf-tree` skill and zero-dep Node 20+ DAG analyzer/live SSE web viewer covering both Work-Item / Linear Dependency Tech-Trees (topological tiers, ready vs. blocked work, Critical Path) and 01–08 Pipeline Stages (staleness blast radius, `sf-review` gates, Mockery parity).
 - **Agile Sizing & Token/Cost Telemetry (Shipped — `v0.5.0`):** On-demand `sf-telemetry` skill and zero-dep Node 20+ CLI pairing Fibonacci sizing (`1, 2, 3, 5, 8`) with offline token/cost pricing, Linear bootstrap & transcript parsers, out-of-repo JSONL storage, and calibration/blowup reports.
 - **Prompting Guide & Evals (Shipped — `v0.6.0`):** Comprehensive operator handbook (`docs/PROMPTING_GUIDE.md`) plus zero-dep Node 20+ automated eval suite (`evals/run.mjs`, golden PulseBoard fixtures, 4 suites, GitHub Actions CI) verifying frontmatter, `<system_state>` fidelity, Missing-Input Guards, `sf-review` vectors, and idle-router token budgets.
-- **Marketplace Publishing (Shipped — `v0.7.0`):** MIT `LICENSE`, minimal SVG logo (`assets/logo.svg`), cross-harness manifests (Antigravity, Claude Code, Gemini CLI), release version-sync automation, community templates, and zero-warning strict validation.
+- **Marketplace Publishing (Shipped — `v0.7.0` / `v0.7.1`):** MIT `LICENSE`, minimal SVG logo (`assets/logo.svg`), cross-harness manifests and marketplace registries (Antigravity, Claude Code, OpenAI Codex, Gemini CLI), release version-sync automation, community templates, and zero-warning strict validation.
 
 ## License
 
