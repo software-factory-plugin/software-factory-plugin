@@ -12,12 +12,18 @@ import {
   REVIEWS_DIR,
   DEFAULT_MOCKUPS_DIR,
 } from "./analyzer.mjs";
+import {
+  findDefaultWorkGraphPath,
+  loadWorkGraphFile,
+} from "./work-analyzer.mjs";
+import { fetchLinearGraph } from "./linear-adapter.mjs";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const UI_HTML_PATH = path.join(SCRIPT_DIR, "ui.html");
 const BIND_HOST = "127.0.0.1";
 const DEFAULT_PORT = 4173;
 const DEFAULT_DEBOUNCE_MS = 150;
+const DEFAULT_POLL_MS = 30000;
 const HEARTBEAT_MS = 25000;
 
 const FALLBACK_UI_HTML = `<!doctype html>
@@ -36,6 +42,7 @@ const FALLBACK_UI_HTML = `<!doctype html>
   <p>The live server is running, but <code>ui.html</code> is not installed yet.</p>
   <ul>
     <li><a href="/api/graph">/api/graph</a></li>
+    <li><a href="/api/work-graph">/api/work-graph</a></li>
     <li><a href="/events">/events</a></li>
   </ul>
 </body>
@@ -118,7 +125,7 @@ function createDirectoryWatcherManager(workspaceRoot, onRelevantChange) {
         const watcher = fs.watch(target.dir, (_eventType, filename) => {
           const fname = filename ? String(filename) : null;
           if (!target.filter(fname)) return;
-          onRelevantChange();
+          onRelevantChange(fname);
         });
         watcher.on("error", () => {
           try {
@@ -130,7 +137,7 @@ function createDirectoryWatcherManager(workspaceRoot, onRelevantChange) {
         });
         watchers.set(target.dir, watcher);
       } catch {
-        // Gracefully skip unwatcheable directories.
+        // Gracefully skip unwatchable directories.
       }
     }
 
@@ -159,6 +166,45 @@ function createDirectoryWatcherManager(workspaceRoot, onRelevantChange) {
 
   sync();
   return { sync, closeAll };
+}
+
+function createSnapshotFileWatcher(filePath, onChange) {
+  const absFile = path.resolve(filePath);
+  const parentDir = path.dirname(absFile);
+  const baseName = path.basename(absFile);
+  let watcher = null;
+
+  function start() {
+    if (watcher) return;
+    try {
+      if (!fs.existsSync(parentDir) || !fs.statSync(parentDir).isDirectory()) {
+        return;
+      }
+      watcher = fs.watch(parentDir, (_eventType, filename) => {
+        const fname = filename ? String(filename) : null;
+        if (fname && fname !== baseName) return;
+        onChange();
+      });
+      watcher.on("error", () => {
+        close();
+      });
+    } catch {
+      watcher = null;
+    }
+  }
+
+  function close() {
+    if (!watcher) return;
+    try {
+      watcher.close();
+    } catch {
+      // ignore
+    }
+    watcher = null;
+  }
+
+  start();
+  return { start, close };
 }
 
 function listenWithFallback(server, preferredPort) {
@@ -220,30 +266,88 @@ function openBrowser(url) {
 }
 
 /**
- * Create and start the live local sf-tree HTTP + SSE server.
+ * Create and start the live local sf-tree HTTP + SSE server (dual-mode: Pipeline Stages + Work Tech-Tree).
  */
 export async function createLiveServer({
   workspaceRoot = process.cwd(),
+  workGraphPath = null,
+  linearProject = null,
+  linearTeam = null,
+  pollMs = DEFAULT_POLL_MS,
+  view = "auto",
   port = DEFAULT_PORT,
   debounceMs = DEFAULT_DEBOUNCE_MS,
   uiHtmlPath = UI_HTML_PATH,
+  fetchLinearImpl = fetchLinearGraph,
 } = {}) {
   const absRoot = path.resolve(workspaceRoot);
+  const absWorkGraphPath = workGraphPath ? path.resolve(workGraphPath) : null;
+  const hasDirectLinear = Boolean(linearProject || linearTeam);
   const sseClients = new Set();
+
   let debounceTimer = null;
+  let workDebounceTimer = null;
+  let pollTimer = null;
   let closed = false;
 
-  function broadcastGraph() {
-    if (closed) return;
-    watcherMgr.sync();
-    if (sseClients.size === 0) return;
+  // In-memory cache for direct Linear GraphQL mode
+  let linearGraphCache = null;
+  let linearError = null;
+  let linearFetchInFlight = null;
+
+  function resolveDefaultView(workAvailable) {
+    if (view === "work") return "work";
+    if (view === "pipeline") return "pipeline";
+    return workAvailable ? "work" : "pipeline";
+  }
+
+  function getWorkGraphEnvelope() {
+    if (hasDirectLinear) {
+      const available = Boolean(linearGraphCache);
+      const envelope = {
+        available,
+        default_view: resolveDefaultView(available || Boolean(linearError)),
+        graph: linearGraphCache,
+      };
+      if (linearError) envelope.error = linearError;
+      return envelope;
+    }
+
+    const activeFile = absWorkGraphPath || findDefaultWorkGraphPath(absRoot);
+    if (!activeFile) {
+      return {
+        available: false,
+        default_view: resolveDefaultView(false),
+        graph: null,
+      };
+    }
+
+    try {
+      const graph = loadWorkGraphFile(activeFile);
+      return {
+        available: true,
+        default_view: resolveDefaultView(true),
+        graph,
+      };
+    } catch (err) {
+      return {
+        available: false,
+        default_view: resolveDefaultView(Boolean(absWorkGraphPath)),
+        graph: null,
+        error: err.message,
+      };
+    }
+  }
+
+  function broadcastSseEvent(eventName, dataObj) {
+    if (closed || sseClients.size === 0) return;
     let payload;
     try {
-      payload = JSON.stringify(analyzeWorkspace(absRoot));
+      payload = JSON.stringify(dataObj);
     } catch {
       return;
     }
-    const frame = `event: graph\ndata: ${payload}\n\n`;
+    const frame = `event: ${eventName}\ndata: ${payload}\n\n`;
     for (const res of sseClients) {
       try {
         res.write(frame);
@@ -253,16 +357,97 @@ export async function createLiveServer({
     }
   }
 
-  function scheduleBroadcast() {
+  function broadcastGraph() {
+    if (closed) return;
+    watcherMgr.sync();
+    if (sseClients.size === 0) return;
+    try {
+      broadcastSseEvent("graph", analyzeWorkspace(absRoot));
+    } catch {
+      // ignore
+    }
+  }
+
+  function broadcastWorkGraph() {
+    if (closed) return;
+    if (sseClients.size === 0) return;
+    broadcastSseEvent("work_graph", getWorkGraphEnvelope());
+  }
+
+  function scheduleBroadcast(changedFilename) {
     if (closed) return;
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
       debounceTimer = null;
       broadcastGraph();
+      // Also push work_graph if repo-local docs/factory/work-graph.json might have changed
+      if (!hasDirectLinear && !absWorkGraphPath) {
+        if (!changedFilename || changedFilename === "work-graph.json" || changedFilename === "factory") {
+          broadcastWorkGraph();
+        }
+      }
     }, debounceMs);
   }
 
+  function scheduleWorkGraphBroadcast() {
+    if (closed) return;
+    if (workDebounceTimer) clearTimeout(workDebounceTimer);
+    workDebounceTimer = setTimeout(() => {
+      workDebounceTimer = null;
+      broadcastWorkGraph();
+    }, debounceMs);
+  }
+
+  async function refreshLinearCache() {
+    if (!hasDirectLinear) {
+      return { ok: false, status: 400, envelope: { error: "live_refresh_not_configured" } };
+    }
+    if (linearFetchInFlight) {
+      return linearFetchInFlight;
+    }
+    linearFetchInFlight = (async () => {
+      try {
+        const fresh = await fetchLinearImpl({
+          project: linearProject,
+          team: linearTeam,
+        });
+        linearGraphCache = fresh;
+        linearError = null;
+        const envelope = getWorkGraphEnvelope();
+        broadcastSseEvent("work_graph", envelope);
+        return { ok: true, status: 200, envelope };
+      } catch (err) {
+        linearError = err.message || "Linear refresh failed";
+        const envelope = getWorkGraphEnvelope();
+        broadcastSseEvent("work_graph", envelope);
+        return { ok: false, status: 502, envelope };
+      } finally {
+        linearFetchInFlight = null;
+      }
+    })();
+    return linearFetchInFlight;
+  }
+
+  // Perform initial direct Linear fetch if configured
+  if (hasDirectLinear) {
+    await refreshLinearCache();
+    if (typeof pollMs === "number" && pollMs > 0) {
+      pollTimer = setInterval(() => {
+        if (!closed) {
+          refreshLinearCache().catch(() => {});
+        }
+      }, pollMs);
+      if (typeof pollTimer.unref === "function") {
+        pollTimer.unref();
+      }
+    }
+  }
+
   const watcherMgr = createDirectoryWatcherManager(absRoot, scheduleBroadcast);
+  const workSnapshotWatcher =
+    !hasDirectLinear && absWorkGraphPath
+      ? createSnapshotFileWatcher(absWorkGraphPath, scheduleWorkGraphBroadcast)
+      : null;
 
   const heartbeatTimer = setInterval(() => {
     for (const res of sseClients) {
@@ -277,19 +462,38 @@ export async function createLiveServer({
     heartbeatTimer.unref();
   }
 
-  const server = http.createServer((req, res) => {
+  const server = http.createServer(async (req, res) => {
     const method = req.method || "GET";
-    if (method !== "GET" && method !== "HEAD") {
-      sendJson(res, 405, { error: "method_not_allowed" });
-      return;
-    }
-
     const rawUrl = req.url || "/";
     const qIdx = rawUrl.indexOf("?");
     const rawPath = qIdx >= 0 ? rawUrl.slice(0, qIdx) : rawUrl;
 
     if (hasUnsafeRawTraversal(rawPath)) {
       sendJson(res, 400, { error: "invalid_path" });
+      return;
+    }
+
+    // Strictly read-only: only POST /api/work-graph/refresh is allowed beyond GET/HEAD
+    if (rawPath === "/api/work-graph/refresh") {
+      if (method !== "POST") {
+        sendJson(res, 405, { error: "method_not_allowed" });
+        return;
+      }
+      if (!hasDirectLinear) {
+        sendJson(res, 400, {
+          error: "live_refresh_not_configured",
+          message:
+            "Direct Linear GraphQL polling is not configured. Start with --linear-project or --linear-team and LINEAR_API_KEY.",
+        });
+        return;
+      }
+      const result = await refreshLinearCache();
+      sendJson(res, result.status, result.envelope);
+      return;
+    }
+
+    if (method !== "GET" && method !== "HEAD") {
+      sendJson(res, 405, { error: "method_not_allowed" });
       return;
     }
 
@@ -309,6 +513,11 @@ export async function createLiveServer({
     if (rawPath === "/api/graph") {
       const graph = analyzeWorkspace(absRoot);
       sendJson(res, 200, graph);
+      return;
+    }
+
+    if (rawPath === "/api/work-graph") {
+      sendJson(res, 200, getWorkGraphEnvelope());
       return;
     }
 
@@ -372,8 +581,15 @@ export async function createLiveServer({
       sseClients.add(res);
 
       try {
-        const initial = JSON.stringify(analyzeWorkspace(absRoot));
-        res.write(`event: graph\ndata: ${initial}\n\n`);
+        const initialPipeline = JSON.stringify(analyzeWorkspace(absRoot));
+        res.write(`event: graph\ndata: ${initialPipeline}\n\n`);
+      } catch {
+        // ignore
+      }
+
+      try {
+        const initialWork = JSON.stringify(getWorkGraphEnvelope());
+        res.write(`event: work_graph\ndata: ${initialWork}\n\n`);
       } catch {
         // ignore
       }
@@ -397,8 +613,19 @@ export async function createLiveServer({
       clearTimeout(debounceTimer);
       debounceTimer = null;
     }
+    if (workDebounceTimer) {
+      clearTimeout(workDebounceTimer);
+      workDebounceTimer = null;
+    }
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
     clearInterval(heartbeatTimer);
     watcherMgr.closeAll();
+    if (workSnapshotWatcher) {
+      workSnapshotWatcher.close();
+    }
     for (const res of sseClients) {
       try {
         res.end();
@@ -419,6 +646,7 @@ export async function createLiveServer({
     url,
     close,
     triggerRefresh: broadcastGraph,
+    triggerWorkGraphRefresh: hasDirectLinear ? refreshLinearCache : broadcastWorkGraph,
   };
 }
 
@@ -428,12 +656,33 @@ export async function createLiveServer({
  */
 export async function startServer({
   workspaceRoot = process.cwd(),
+  workGraphPath = null,
+  linearProject = null,
+  linearTeam = null,
+  pollMs = DEFAULT_POLL_MS,
+  view = "auto",
   port = DEFAULT_PORT,
   open = true,
 } = {}) {
-  const instance = await createLiveServer({ workspaceRoot, port });
+  const instance = await createLiveServer({
+    workspaceRoot,
+    workGraphPath,
+    linearProject,
+    linearTeam,
+    pollMs,
+    view,
+    port,
+  });
   process.stdout.write(`sf-tree live viewer running at ${instance.url}\n`);
-  process.stdout.write(`Watching ${path.resolve(workspaceRoot, FACTORY_DIR)}\n`);
+  process.stdout.write(`Watching pipeline: ${path.resolve(workspaceRoot, FACTORY_DIR)}\n`);
+  if (workGraphPath) {
+    process.stdout.write(`Watching work-graph: ${path.resolve(workGraphPath)}\n`);
+  } else if (linearProject || linearTeam) {
+    const scope = linearProject ? `project=${linearProject}` : `team=${linearTeam}`;
+    process.stdout.write(
+      `Direct Linear GraphQL (${scope}, poll=${pollMs > 0 ? `${pollMs}ms` : "manual"})\n`
+    );
+  }
   process.stdout.write("Press Ctrl+C to stop.\n");
 
   if (open) {
