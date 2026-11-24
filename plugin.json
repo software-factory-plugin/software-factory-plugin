@@ -1,7 +1,7 @@
 {
   "name": "software-factory",
   "displayName": "Software Factory",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Lightweight DAG-based software factory pipeline (Vision, Market Research, BRD, PRD, UX, UI, optional interactive Mockery prototypes, Architecture, Agentic TDD Specs, Adversarial Red Team Review, and live sf-tree tech-tree visualization) using 80/20 hybrid artifacts and strict <system_state> handoffs.",
   "author": "jamesconant",
   "homepage": "https://github.com/software-factory-plugin/software-factory-plugin",
