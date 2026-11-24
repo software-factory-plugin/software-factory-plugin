@@ -2,6 +2,14 @@
 
 All notable changes to `software-factory-plugin` are documented in this file.
 
+## [0.9.0] — 2026-11-24
+
+### Added (Bundled Mockery Runtime & Standalone Offline Export)
+- Folded the zero-dependency Node.js 20+ Mockery runtime directly into `skills/sf-mockery/scripts/` (`cli.mjs`, `check.mjs`, `server.mjs`, `export.mjs`, and `viewer/`), eliminating any external Mockery repo, `npm`, or `npx` requirement on fresh machines.
+- Added `export` (`node skills/sf-mockery/scripts/cli.mjs export docs/factory/mockups`) to compile a Mockery flow canvas (`flow.json`, `tokens.css`, `kit.css`, optional `fonts.css`, `components/*.html`, `screens/*.html`, local `assets/*` as base64 `data:` URIs, and the canvas viewer) into a single self-contained `preview.html` that opens over `file://` with zero server or Node.js runtime required.
+- Updated `skills/sf-mockery/SKILL.md`, `skills/sf-tree` (`analyzer.mjs`, `formatters.mjs`, `ui.html`), `README.md`, and `docs/PROMPTING_GUIDE.md` to use the bundled zero-dependency CLI for `check`, `serve`, and `export`.
+- Completed the golden PulseBoard mockup fixture under `evals/fixtures/pulseboard/mockups/` and added automated `checkProject`, negative `<script>` lint, and `exportProject` JS-syntax validation checks to `evals/suites/golden-schemas.mjs` (`156/156` checks passing; zero added idle router token overhead).
+
 ## [0.8.0] — 2026-11-24
 
 ### Added (Built-In Prompt Quality Gate)

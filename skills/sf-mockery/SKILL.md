@@ -57,11 +57,13 @@ All Mockery project files live under `docs/factory/mockups/` (`flow.json`, `toke
 
 ## Execution Steps
 
+Resolve `<skill_dir>` to the directory containing this `SKILL.md` (where the bundled zero-dependency Node 20+ CLI `scripts/cli.mjs` resides—no external Mockery install or `npm`/`npx` needed).
+
 1. **Validate Inputs & Mode:** Parse required upstream `<system_state>` JSON blocks (stopping on missing/invalid inputs), lock all inherited constraints, and determine whether this run is **Styled Mode** (`06-ui.md` present), **Wireframe Mode** (explicit post-`sf-ux` pass without `06-ui.md`), or an in-place restyle/update of an existing `docs/factory/mockups/` folder.
 2. **Plan Canvas Structure:** Map every `sf-ux` `screens_required` entry, `primary_navigation_pattern`, `key_interactions`, and critical `empty`/`loading`/`error` state (from `sf-ux` / `sf-prd`) to device-sized nodes, sections, edges, and shared components.
 3. **Write Mockery Canvas Files:** Create or update `docs/factory/mockups/tokens.css`, `kit.css`, `components/*.html`, `screens/*.html`, and `flow.json` (plus optional `fonts.css`), ensuring zero `CLAUDE.md` file is created inside `docs/factory/mockups/`.
-4. **Run Deterministic Checks:** If the `mockery` CLI is installed and supports `check`, run `mockery check docs/factory/mockups --json` (or `npx mockery check docs/factory/mockups --json`) and resolve every error before returning. If `mockery` is absent or v0.2.0 (without `check`), run the static self-checks below directly against the files on disk.
-5. **Write 80/20 Manifest & Handoff:** Produce `docs/factory/06b-mockery.md` with exact headings and strict `<system_state>`, print the viewer launch command, and pause for human review.
+4. **Run Deterministic Checks:** Run the bundled validator `node <skill_dir>/scripts/cli.mjs check docs/factory/mockups --json` and resolve every error before returning. If Node 20+ is unavailable, run the static self-checks below directly against the files on disk.
+5. **Write 80/20 Manifest & Handoff:** Produce `docs/factory/06b-mockery.md` with exact headings and strict `<system_state>`, print the bundled viewer and standalone export commands, and pause for human review.
 
 ## Output Format (80/20 Hybrid Artifact)
 
@@ -104,7 +106,8 @@ Before returning the artifact, run these self-checks:
 3. **Zero Leakage:** Every `sf-ux` screen and interaction is represented; zero `explicitly_out_of_scope` features, `hard_constraints` violations, or production app code leaked.
 
 - **Save Location:** When working in a workspace/repository, write the Mockery project to `docs/factory/mockups/` and the 80/20 manifest to `docs/factory/06b-mockery.md` in addition to returning the manifest summary in chat.
-- **Viewer Launch & Pure File-Only Fallback:**
-  - If `mockery` is installed (`command -v mockery` or local `node_modules/.bin/mockery`), provide `npx mockery docs/factory/mockups` (or `npx mockery` on Mockery v0.3.0+) and offer to start the local viewer for interactive browser inspection.
-  - If `mockery` is not installed, succeed cleanly in file-only mode and note that the user can install Mockery later and run `npx mockery docs/factory/mockups` with zero changes to the generated files.
+- **Bundled Viewer Launch & Standalone Offline Export:**
+  - **Live Hot-Reload Canvas (built-in, zero external dependencies):** Provide `node <skill_dir>/scripts/cli.mjs serve docs/factory/mockups` (binds `127.0.0.1:5180` with automatic free-port stepping and SSE hot reload) and offer to start it for interactive browser inspection.
+  - **Standalone Single-File Preview (`export`):** When stakeholders need to review the clickable prototype without running a server or installing Node.js, run `node <skill_dir>/scripts/cli.mjs export docs/factory/mockups` (or `--out <path>`) to emit one self-contained `preview.html` that opens directly in any browser over `file://`.
+  - **Graceful Fallback (No Node 20+):** Succeed cleanly in pure file-only mode; generated files remain 100% compatible with the bundled CLI whenever Node 20+ is available.
 - **Handoff Gate:** Pause for human review and suggest running `sf-review` against upstream artifacts (`sf-vision` + `sf-ux`, plus `sf-ui` in `styled` mode) before advancing to `sf-architecture` (or `sf-ui` if in `wireframe` mode). Never auto-advance.

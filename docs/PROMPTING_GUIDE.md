@@ -63,9 +63,11 @@ You do **not** have to memorize every high-signal template above. Every Software
 
 ### Stage 6b (Optional) — `sf-mockery` (`docs/factory/06b-mockery.md` + `docs/factory/mockups/`)
 - **Styled Mode (after `sf-ui`):**
-  > *"Run `sf-mockery` in styled mode using `01-vision.md`, `05-ux.md`, and `06-ui.md` to generate a clickable flow canvas under `docs/factory/mockups/` synced to our UI tokens."*
+  > *"Run `sf-mockery` in styled mode using `01-vision.md`, `05-ux.md`, and `06-ui.md` to generate a clickable flow canvas under `docs/factory/mockups/` synced to our UI tokens, validate it with the bundled checker, and offer to serve or export a standalone `preview.html`."*
 - **Wireframe Mode (after `sf-ux`, before `sf-ui`):**
   > *"Run `sf-mockery` in wireframe mode from `05-ux.md` so we can click through flows before choosing colors and fonts."*
+- **Standalone Offline Export (Zero-Runtime Stakeholder Share):**
+  > *"Export `docs/factory/mockups/` to a single standalone `preview.html` using `sf-mockery`'s bundled exporter so stakeholders can open and click through it without a local server."*
 
 ### Stage 7 — `sf-architecture` (`docs/factory/07-architecture.md`)
 > *"Run `sf-architecture` using `01-vision.md`, `03-brd.md`, `04-prd.md`, `05-ux.md`, and `06-ui.md` (plus `06b-mockery.md` if present). Select the exact frontend/backend stack, database schema, data models, and core API endpoints."*

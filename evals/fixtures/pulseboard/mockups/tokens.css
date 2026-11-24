@@ -1,0 +1,31 @@
+:host {
+  --color-bg: #0B1120;
+  --color-surface: #111827;
+  --color-surface-2: #1F2937;
+  --color-border: #374151;
+  --color-header: #0F172A;
+  --color-on-header: #F9FAFB;
+  --color-text: #F9FAFB;
+  --color-text-muted: #9CA3AF;
+  --color-accent: #2563EB;
+  --color-accent-soft: rgba(37, 99, 235, 0.16);
+  --color-on-accent: #FFFFFF;
+  --color-success: #16A34A;
+  --color-success-soft: rgba(22, 163, 74, 0.16);
+  --color-warning: #D97706;
+  --color-warning-soft: rgba(217, 119, 6, 0.16);
+  --color-danger: #DC2626;
+  --color-danger-soft: rgba(220, 38, 38, 0.16);
+  --font-sans: Inter, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-base: 16px;
+  --text-xl: 22px;
+  --space-2: 8px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-pill: 999px;
+}

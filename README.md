@@ -100,18 +100,22 @@ node skills/sf-telemetry/scripts/cli.mjs report --markdown
 
 ## Optional Interactive Mockups (`sf-mockery`)
 
-Between UX/UI and Architecture, you can optionally invoke `sf-mockery` to generate a clickable, pannable **Mockery** flow canvas under `docs/factory/mockups/` (`flow.json`, static HTML screens, reusable `<x-include>` partials, `tokens.css`, `kit.css`) alongside `docs/factory/06b-mockery.md`:
+Between UX/UI and Architecture, you can optionally invoke `sf-mockery` to generate a clickable, pannable **Mockery** flow canvas under `docs/factory/mockups/` (`flow.json`, static HTML screens, reusable `<x-include>` partials, `tokens.css`, `kit.css`) alongside `docs/factory/06b-mockery.md`—powered by a **built-in, zero-dependency Node.js 20+ runtime** under `skills/sf-mockery/scripts/` (no separate Mockery install, `npm`, or `npx` required):
 
 - **Styled Mode (default, after `sf-ui`):** Maps `sf-ux` screens/transitions and `sf-ui` design tokens directly into `docs/factory/mockups/`.
 - **Wireframe Mode (optional, after `sf-ux`):** Generates neutral grayscale screens so you can inspect flows before `sf-ui`, then restyles `tokens.css` and `kit.css` in place after `sf-ui` completes.
-- **Zero Lock-In & Pure File-Only Fallback:** Baseline `sf-ux` → `sf-ui` → `sf-architecture` works identically without Mockery installed. When Mockery is installed in your project, preview and validate the canvas locally:
+- **Standalone Offline Export (`export`):** Compiles the entire canvas (screens, components, tokens, local `assets/`, and viewer) into a single self-contained `preview.html` file that stakeholders can double-click and pan/zoom/click through in any browser with zero server or Node.js installed.
+- **Zero Lock-In:** Baseline `sf-ux` → `sf-ui` → `sf-architecture` works identically if you skip Stage 6b.
 
 ```bash
-# Validate flow.json, screens, components, edges, and static lints (Mockery v0.3.0+)
-npx mockery check docs/factory/mockups
+# Validate flow.json, screens, <x-include> components, edges, and static lints
+node skills/sf-mockery/scripts/cli.mjs check docs/factory/mockups
 
-# Start the live hot-reload flow canvas viewer (auto-detects docs/factory/mockups on v0.3.0+)
-npx mockery docs/factory/mockups
+# Start the live hot-reload flow canvas viewer on 127.0.0.1:5180 (auto-detects docs/factory/mockups)
+node skills/sf-mockery/scripts/cli.mjs serve docs/factory/mockups
+
+# Bundle into one standalone offline preview.html (zero server or Node.js needed to open)
+node skills/sf-mockery/scripts/cli.mjs export docs/factory/mockups
 ```
 
 ## Prompting Guide & Automated Evals
@@ -140,7 +144,7 @@ agy plugin validate --strict /path/to/software-factory-plugin
 agy plugin install /path/to/software-factory-plugin
 
 # Or install a pinned version from GitHub
-agy plugin install https://github.com/software-factory-plugin/software-factory-plugin/tree/v0.8.0
+agy plugin install https://github.com/software-factory-plugin/software-factory-plugin/tree/v0.9.0
 ```
 
 Alternatively, register the local directory in `~/.gemini/config/plugins.json` (global) or `.agents/plugins.json` (workspace):

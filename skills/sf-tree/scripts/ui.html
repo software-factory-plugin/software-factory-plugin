@@ -2967,6 +2967,7 @@
         [
           ["Copy Viewer", mockery.viewer_command],
           ["Copy Check", mockery.check_command],
+          ...(mockery.export_command ? [["Copy Export", mockery.export_command]] : []),
         ].forEach(([btnText, cmd]) => {
           const row = el("div", "cmd-row");
           row.appendChild(el("code", "cmd-code", cmd));

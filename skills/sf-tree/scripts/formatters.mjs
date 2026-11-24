@@ -213,6 +213,7 @@ export function formatAscii(graph) {
     );
     lines.push(`  viewer: ${m.viewer_command}`);
     lines.push(`  check:  ${m.check_command}`);
+    if (m.export_command) lines.push(`  export: ${m.export_command}`);
   }
 
   const actionable = graph.nodes.filter(

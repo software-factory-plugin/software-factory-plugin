@@ -1,0 +1,17 @@
+<div class="screen">
+  <x-include src="topbar" section="Monitors">
+    <button class="btn" data-goto="public-status">View Public Page</button>
+    <button class="btn btn--primary" data-goto="monitor-drawer">+ New Monitor</button>
+  </x-include>
+  <main class="main">
+    <div class="card">
+      <div>API Gateway · 99.98%</div>
+      <x-include src="status-pill" tone="ok" label="Operational"></x-include>
+    </div>
+    <div class="card">
+      <div>Webhook Worker · Elevated Errors</div>
+      <x-include src="status-pill" tone="outage" label="Outage"></x-include>
+      <button class="btn" data-goto="incident-detail">Inspect Incident</button>
+    </div>
+  </main>
+</div>

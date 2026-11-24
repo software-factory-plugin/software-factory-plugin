@@ -1,0 +1,255 @@
+/* Viewer chrome only. Screens are styled by tokens.css + kit.css inside their shadow roots. */
+
+:root {
+  color-scheme: dark;
+  --canvas: #161719;
+  --dot: #2c2e33;
+  --ink: #ececee;
+  --ink-2: #9b9ea6;
+  --edge: #a7abb4;
+  --edge-error: #ff6b5e;
+  --edge-success: #4fd18b;
+  --edge-muted: #62656d;
+  --label-bg: #26282c;
+  --label-border: #3a3d43;
+  --bezel: #0a0a0b;
+  --bezel-ring: #34363b;
+  --lod-bg: #222428;
+  --select: #4c8dff;
+  --hud-bg: rgb(30 31 34 / 0.85);
+  --hud-border: #34363b;
+  --section-blue: #5b8def;
+  --section-green: #3fb27f;
+  --section-amber: #e3a33b;
+  --section-red: #e5534b;
+  --section-violet: #9a7bf0;
+  --section-gray: #8b8f98;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --canvas: #eceef1;
+  --dot: #c6cad1;
+  --ink: #1d1f23;
+  --ink-2: #5d6169;
+  --edge: #5e636d;
+  --edge-error: #d33a2f;
+  --edge-success: #1f9d55;
+  --edge-muted: #a9adb5;
+  --label-bg: #ffffff;
+  --label-border: #d5d8de;
+  --bezel: #1b1c1f;
+  --bezel-ring: #c5c8ce;
+  --lod-bg: #ffffff;
+  --hud-bg: rgb(255 255 255 / 0.85);
+  --hud-border: #d5d8de;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--canvas);
+  color: var(--ink);
+  font: 13px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+/* ---- canvas ---- */
+
+#viewport {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  background-image: radial-gradient(circle at center, var(--dot) 1.2px, transparent 1.5px);
+}
+#viewport.is-panning { cursor: grabbing; }
+
+#world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+#world.is-moving { will-change: transform; }
+#world > * { position: absolute; left: 0; top: 0; }
+
+#edges { width: 1px; height: 1px; overflow: visible; pointer-events: none; }
+#labels { pointer-events: none; }
+/* --s (camera scale) is set by the renderer; --k counter-scales strokes and labels when zoomed out. */
+#edges, #labels { --k: clamp(1, calc(1 / var(--s, 1)), 6); }
+
+/* ---- sections ---- */
+
+.section {
+  position: absolute;
+  border-radius: 32px;
+  background: color-mix(in srgb, var(--c) 8%, transparent);
+  border: 2px solid color-mix(in srgb, var(--c) 32%, transparent);
+}
+.section-title {
+  position: absolute;
+  white-space: nowrap;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--c);
+  transform-origin: 0 0;
+  transform: scale(var(--k)) translateY(-100%);
+}
+
+/* ---- frames ---- */
+
+.frame { position: absolute; }
+.frame-bezel {
+  position: absolute;
+  inset: calc(var(--bz) * -1);
+  border-radius: var(--bz-r);
+  background: var(--bezel);
+  box-shadow: 0 0 0 1px var(--bezel-ring), 0 24px 60px -24px rgb(0 0 0 / 0.55);
+}
+.frame-screen {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: var(--screen-r);
+  background: var(--lod-bg);
+  contain: strict;
+}
+.frame-lod {
+  position: absolute;
+  inset: 0;
+  display: none;
+  place-items: center;
+  padding: 8%;
+  border-radius: var(--screen-r);
+  background: var(--lod-bg);
+  color: var(--ink);
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
+}
+.frame.is-lod .frame-screen { display: none; }
+.frame.is-lod .frame-lod { display: grid; }
+.frame.is-culled .frame-screen,
+.frame.is-culled .frame-lod { display: none; }
+.frame.is-culled .frame-bezel { visibility: hidden; }
+.frame.is-selected .frame-bezel { box-shadow: 0 0 0 6px var(--select), 0 24px 60px -24px rgb(0 0 0 / 0.55); }
+
+.frame-title {
+  position: absolute;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-2);
+  transform-origin: 0 0;
+  transform: scale(var(--k)) translateY(-100%);
+}
+
+/* Devices: --bz bezel width, --bz-r bezel radius, --screen-r screen corner radius. */
+.device-phone { --bz: 12px; --bz-r: 56px; --screen-r: 44px; }
+.device-tablet { --bz: 20px; --bz-r: 40px; --screen-r: 20px; }
+.device-pos { --bz: 16px; --bz-r: 22px; --screen-r: 6px; }
+.device-pos .frame-bezel { bottom: -56px; } /* chin with card reader slot */
+.device-pos .frame-bezel::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 20px;
+  width: 140px;
+  height: 8px;
+  margin-left: -70px;
+  border-radius: 4px;
+  background: #2a2b2f;
+}
+.device-desktop { --bz: 1px; --bz-r: 12px; --screen-r: 0 0 11px 11px; }
+.device-desktop .frame-bezel { top: -36px; background: #2b2d31; }
+.device-desktop .frame-bezel::before {
+  content: '';
+  position: absolute;
+  left: 14px;
+  top: 13px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ff5f57;
+  box-shadow: 16px 0 #febc2e, 32px 0 #28c840;
+}
+.device-none { --bz: 0px; --bz-r: 8px; --screen-r: 8px; }
+
+/* ---- edges ---- */
+
+.edge { color: var(--edge); }
+.edge-line { fill: none; stroke: currentColor; stroke-width: calc(2px * var(--k)); }
+.edge-lead {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: calc(1.5px * var(--k));
+  stroke-dasharray: calc(2px * var(--k)) calc(4px * var(--k));
+  stroke-linecap: round;
+  opacity: 0.7;
+}
+.edge-head { fill: currentColor; }
+.edge-anchor {
+  fill: color-mix(in srgb, currentColor 12%, transparent);
+  stroke: currentColor;
+  stroke-width: calc(2px * var(--k));
+}
+.edge--dashed .edge-line { stroke-dasharray: calc(8px * var(--k)) calc(6px * var(--k)); }
+
+.edge-label {
+  position: absolute;
+  transform: translate(-50%, -50%) scale(var(--k));
+  white-space: nowrap;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--label-bg);
+  border: 1px solid var(--label-border);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.edge--error { color: var(--edge-error); }
+.edge--success { color: var(--edge-success); }
+.edge--muted { color: var(--edge-muted); }
+
+/* ---- HUD ---- */
+
+#hud {
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  border: 1px solid var(--hud-border);
+  border-radius: 10px;
+  background: var(--hud-bg);
+  backdrop-filter: blur(10px);
+  color: var(--ink-2);
+  font-size: 12px;
+  user-select: none;
+}
+#hud b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; min-width: 3.5em; }
+#hud kbd { font: inherit; padding: 0 5px; border: 1px solid var(--hud-border); border-radius: 4px; }
+#status { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-2); }
+#status.is-live { background: #3fb950; }
+#status.is-down { background: #f85149; }
+#status.is-static { background: #5b8def; }
+#flash { color: var(--ink); opacity: 0; transition: opacity 0.5s; }
+#flash.is-on { opacity: 1; transition: none; }
+
+#toast {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 80%;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: #b42318;
+  color: #fff;
+  font: 12px/1.4 ui-monospace, Menlo, monospace;
+}
+#toast:empty { display: none; }

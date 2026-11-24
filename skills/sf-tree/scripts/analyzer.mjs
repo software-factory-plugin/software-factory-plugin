@@ -1,6 +1,15 @@
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+
+const BUNDLED_MOCKERY_CLI = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../../sf-mockery/scripts/cli.mjs"
+);
+const QUOTED_MOCKERY_CLI = /\s/.test(BUNDLED_MOCKERY_CLI)
+  ? `"${BUNDLED_MOCKERY_CLI}"`
+  : BUNDLED_MOCKERY_CLI;
 
 export const SCHEMA_VERSION = "1.0";
 export const FACTORY_DIR = "docs/factory";
@@ -656,8 +665,9 @@ function analyzeMockery(workspaceRoot, mockeryNode) {
     components_count: componentsCount,
     edges_count: edgesCount,
     parity_warnings: parityWarnings,
-    viewer_command: `npx mockery ${mockupsDir}`,
-    check_command: `npx mockery check ${mockupsDir}`,
+    viewer_command: `node ${QUOTED_MOCKERY_CLI} serve ${mockupsDir}`,
+    check_command: `node ${QUOTED_MOCKERY_CLI} check ${mockupsDir}`,
+    export_command: `node ${QUOTED_MOCKERY_CLI} export ${mockupsDir}`,
   };
 }
 

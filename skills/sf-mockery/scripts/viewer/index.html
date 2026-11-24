@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en" data-project="{{project-id}}">
+<head>
+  <meta charset="utf-8">
+  <title>{{project-name}} · Mockery</title>
+  <link rel="stylesheet" href="/__mockery/viewer.css">
+  <link rel="stylesheet" href="/__mockery/fonts.css">
+  <script type="module" src="/__mockery/main.js"></script>
+</head>
+<body>
+  <div id="viewport">
+    <div id="world">
+      <div id="sections"></div>
+      <div id="frames"></div>
+      <svg id="edges" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div id="labels">
+        <div id="section-titles"></div>
+        <div id="frame-titles"></div>
+        <div id="edge-labels"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="hud">
+    <span id="status" title="Hot reload connection"></span>
+    <b id="zoom">100%</b>
+    <span class="hints"><kbd>0</kbd> fit <kbd>+</kbd><kbd>−</kbd> zoom <kbd>1</kbd> 100% <kbd>T</kbd> theme</span>
+    <span id="flash"></span>
+  </div>
+  <div id="toast"></div>
+</body>
+</html>

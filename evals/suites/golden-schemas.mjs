@@ -6,6 +6,8 @@ import {
   extractSystemState,
   REQUIRED_KEYS,
 } from "../../skills/sf-tree/scripts/analyzer.mjs";
+import { checkProject } from "../../skills/sf-mockery/scripts/check.mjs";
+import { exportProject } from "../../skills/sf-mockery/scripts/export.mjs";
 
 function copyDirRecursive(src, dest) {
   fs.mkdirSync(dest, { recursive: true });
@@ -82,9 +84,56 @@ export function runGoldenSchemasEval(repoRoot) {
     );
     add(
       "golden-pipeline:optional-mockery",
-      graph.summary.optional_completed === 1 && graph.mockery.flow_json_valid === true,
-      `optional=${graph.summary.optional_completed}/1, flow_json_valid=${graph.mockery.flow_json_valid}`
+      graph.summary.optional_completed === 1 &&
+        graph.mockery.flow_json_valid === true &&
+        graph.mockery.parity_warnings.length === 0,
+      `optional=${graph.summary.optional_completed}/1, flow_json_valid=${graph.mockery.flow_json_valid}, parity_warnings=${graph.mockery.parity_warnings.length}`
     );
+
+    // 2b. Validate bundled sf-mockery check + standalone single-file HTML export
+    const mockupsDir = path.join(factoryDir, "mockups");
+    const mockCheck = checkProject(mockupsDir);
+    add(
+      "golden-mockery:check-pass",
+      mockCheck.ok && mockCheck.errors.length === 0 && mockCheck.warnings.length === 0,
+      `ok=${mockCheck.ok}, nodes=${mockCheck.summary.nodes}, edges=${mockCheck.summary.edges}, components=${mockCheck.summary.components}, warnings=${mockCheck.warnings.length}`
+    );
+
+    const exportOut = path.join(tmpRoot, "pulseboard-preview.html");
+    const exported = exportProject(mockupsDir, { outFile: exportOut });
+    const exportedHtml = fs.readFileSync(exportOut, "utf8");
+    const scriptBlocks = [...exportedHtml.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+    let viewerJsValid = scriptBlocks.length === 2;
+    if (viewerJsValid) {
+      try {
+        // Parse-check the bundled viewer JS to guarantee zero syntax issues on file://
+        new Function(scriptBlocks[1]);
+      } catch {
+        viewerJsValid = false;
+      }
+    }
+    add(
+      "golden-mockery:standalone-export",
+      exported.ok &&
+        exported.summary.screens === 4 &&
+        exported.summary.components === 2 &&
+        exportedHtml.includes("window.__MOCKERY_BUNDLE__") &&
+        !exportedHtml.includes("/__mockery/") &&
+        viewerJsValid,
+      `bytes=${exported.bytes}, screens=${exported.summary.screens}, components=${exported.summary.components}, js_valid=${viewerJsValid}`
+    );
+
+    // Negative Mockery check: <script> inside a screen triggers screen-lint error
+    const screenPath = path.join(mockupsDir, "screens", "public-status.html");
+    const origScreen = fs.readFileSync(screenPath, "utf8");
+    fs.writeFileSync(screenPath, `${origScreen}\n<script>alert(1)</script>\n`);
+    const badMockCheck = checkProject(mockupsDir);
+    add(
+      "negative:mockery-script-lint-detected",
+      !badMockCheck.ok && badMockCheck.errors.some((e) => e.code === "screen-lint"),
+      `errors=${JSON.stringify(badMockCheck.errors.map((e) => e.code))}`
+    );
+    fs.writeFileSync(screenPath, origScreen);
     add(
       "golden-pipeline:zero-invalid-or-stale",
       graph.summary.invalid_phases.length === 0 &&
