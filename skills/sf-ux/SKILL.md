@@ -20,6 +20,11 @@ Translate the PRD into structural user flows, navigation hierarchy, and screen l
 - **Missing-Input Guard:** If any required upstream `<system_state>` block is missing or contains invalid JSON, STOP immediately and ask the user to provide it (or offer to run `sf-vision` / `sf-prd` first). Never guess or invent upstream requirements.
 - **Strict Constraint Inheritance:** Every screen, navigation path, and interaction must strictly honor upstream `hard_constraints` and `explicitly_out_of_scope` (plus `compliance_requirements` and `budget_or_timeline_constraints` when present).
 - **Stage Boundaries & Gates:** Focus strictly on usability, friction reduction, information architecture, structural ASCII/descriptive wireframes, interaction behaviors, and accessibility requirements. Do NOT select colors, typography, or CSS frameworks (leave to `sf-ui`), and do NOT invent features absent from the PRD.
+- **Prompt Quality Gate (Context-Aware):** Run after resolving `01-vision.md` and `04-prd.md` (exempt targeted revisions of `05-ux.md` or `sf-review` fixes):
+  - *High-Signal Check:* If `01-vision.md` + `04-prd.md` resolve cleanly and no anti-pattern is triggered, concise prompts (e.g., *"Run `sf-ux`"*) pass silently. Pause only if target surface/form-factor (e.g., desktop vs. mobile-first), navigation density, or WCAG/accessibility level is critically ambiguous for the PRD flows, or an anti-pattern is hit.
+  - *Anti-Patterns:* **Multi-stage bundling** (non-overridable; offer to run `sf-ux` alone first), stage-boundary bleed (asking for colors, fonts, or CSS frameworks), or inventing screens outside `sf-prd`.
+  - *When Weak/Ambiguous:* Pause in 1 turn and show: (1) 1–3 brief gap/anti-pattern bullets, (2) a suggested High-Signal Prompt pre-filled with upstream context and explicit `[placeholders]` for unknowns, (3) 2–4 targeted follow-up questions, and (4) three options: answer to tailor & run, edit/accept the prompt, or reply `"proceed anyway"` to override.
+  - *Override & Upfront Bypass:* Soft gaps are overridable via `"proceed anyway"`, `"use defaults"`, or `"skip prompt check"`; when overridden, state inferred defaults in a brief **Assumptions Used** note in chat without altering artifact headings or `<system_state>` schema. Missing-Input Guard and multi-stage bundling are never overridable.
 
 ## Execution Steps
 

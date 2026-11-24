@@ -16,6 +16,11 @@ Pair disciplined Fibonacci agile sizing (`1, 2, 3, 5, 8`) with LLM model, token,
 - **Out-of-Repo Storage Default:** Telemetry JSONL logs live outside the repository working tree under `~/.config/software-factory/telemetry/<workspace-slug>.jsonl` (overridable via `--store <path>` or `SF_TELEMETRY_STORE`).
 - **8-Point Epic Split Gate:** Any issue estimated at `8` points carries high token-variance risk and MUST be decomposed into scoped `1`–`5` point issues before moving to `In Progress`.
 - **Zero External Dependencies:** All scripts under `<skill_dir>/scripts/` (`cli.mjs`, `schema.mjs`, `pricing.mjs`, `parsers.mjs`, `calibrator.mjs`) run exclusively on Node.js 20+ stdlib.
+- **Prompt Quality Gate (Context-Aware):** Evaluate before invoking `scripts/cli.mjs` (exempt follow-up refinements to an active telemetry command):
+  - *High-Signal Check:* Pass silently when the requested workflow (`size-check`, `log`, `format-comment`, `import-bootstrap`, `import-transcript`, or `report`) and its required inputs (estimate, issue ID/felt size, or import source path) are clear from prompt or conversation context. Pause on vague prompts (e.g., *"Check telemetry"* or *"Size this"*) missing workflow or target inputs.
+  - *Anti-Patterns:* Asking to install always-on hooks, commit telemetry logs into the consumer repo, or skip splitting an `8`-point epic (all non-overridable).
+  - *When Weak/Ambiguous:* Pause in 1 turn and show: (1) 1–3 brief gap/anti-pattern bullets, (2) a suggested High-Signal Prompt pre-filled with known context and explicit `[placeholders]` for unknowns, (3) 2–4 targeted follow-up questions, and (4) three options: answer to tailor & run, edit/accept the prompt, or reply `"proceed anyway"` to override.
+  - *Override & Upfront Bypass:* Soft workflow/format ambiguities are overridable via `"proceed anyway"`, `"use defaults"`, or `"skip prompt check"` (list assumed flags/defaults under **Assumptions Used** in chat). Zero-idle-overhead, out-of-repo storage, and the `8`-Point Epic Split Gate are never overridable.
 
 ## Fibonacci Sizing Rubric
 

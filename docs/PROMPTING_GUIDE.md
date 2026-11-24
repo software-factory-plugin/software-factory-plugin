@@ -26,6 +26,19 @@ Every Software Factory project follows a simple, human-validated cadence:
 | **Red Team auditing** | *"Does my architecture look okay?"* | *"Run `sf-review` comparing upstream `01-vision.md` and `04-prd.md` against `07-architecture.md`. Flag any out-of-scope features, missing flows, or `<system_state>` drift."* |
 | **Visualizing work** | *"What should I work on?"* | *"Use `sf-tree` in Work Tech-Tree mode for Linear team `SOF`: show ready/unlocked tickets, blockers, and the estimate-weighted remaining Critical Path, then launch `--serve`."* |
 
+### Built-In Prompt Quality Gate (All 12 Skills)
+
+You do **not** have to memorize every high-signal template above. Every Software Factory skill includes a context-aware, behind-the-scenes **Prompt Quality Gate** (zero idle token overhead; identical across Antigravity, Claude Code, Codex, and Gemini CLI):
+
+- **Silent When Clear:** Downstream skills resolve `docs/factory/` upstream `<system_state>` blocks first. Concise prompts like *"Run `sf-prd`"* pass silently when upstream files already make execution unambiguous. Targeted revisions to an existing artifact or `sf-review` blocking-issue fixes also bypass the gate automatically.
+- **1-Turn Coaching When Weak or Ambiguous:** If your prompt plus resolved upstream state still leaves stage-critical ambiguities (e.g., a one-line `sf-vision` idea with no user/constraints/exclusions, an `sf-brd` prompt with no monetization or budget hints, or a vague `sf-review` / `sf-tree` scope), the skill pauses before generating and shows:
+  1. **Gap / Anti-Pattern Diagnosis** (1–3 concise bullets),
+  2. **Suggested High-Signal Prompt** pre-filled with known context and explicit `[placeholders]` for unknowns (never silently inventing assumptions),
+  3. **2–4 Targeted Follow-Up Questions** covering only those `[placeholders]`, and
+  4. **Three Ways to Continue:** answer the questions to tailor & run, edit/accept the suggested prompt, or reply `"proceed anyway"` to override.
+- **Soft Overrides & Upfront Bypass:** For soft ambiguities, you can reply `"proceed anyway"`—or pass `"use defaults"` / `"skip prompt check"` upfront on turn 1. The skill runs and lists any inferred defaults under a brief **Assumptions Used** note in chat without altering the saved artifact's strict headings or `<system_state>` schema.
+- **Non-Overridable Hard Invariants:** Missing-Input Guards, **multi-stage bundling** (asking to run multiple pipeline stages at once—the skill offers to run only the single next stage), `sf-review`'s no-rewrite rule, `sf-tree`'s read-only guard, and `sf-telemetry`'s 8-point epic split gate cannot be overridden.
+
 ---
 
 ## 3. Copy-Paste Starter Prompts (All 12 Skills)

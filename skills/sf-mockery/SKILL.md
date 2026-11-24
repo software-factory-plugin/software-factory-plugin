@@ -26,6 +26,11 @@ Translate validated UX flows and UI design tokens into a live, clickable Mockery
   - Generate static Mockery canvas files under `docs/factory/mockups/` and the 80/20 manifest at `docs/factory/06b-mockery.md`.
   - Do **NOT** write a `CLAUDE.md` file inside `docs/factory/mockups/` (authoring rules live in this skill to keep zero idle token overhead in consumer repos).
   - Do **NOT** write production frontend code, mutate upstream `05-ux.md`/`06-ui.md`, or invent screens/features absent from `sf-ux`.
+- **Prompt Quality Gate (Context-Aware):** Run after resolving upstream `<system_state>` (exempt granular edits to existing `docs/factory/mockups/` or `sf-review` fixes):
+  - *High-Signal Check:* Pass silently when fidelity mode (`styled` with `06-ui.md`, or explicit `wireframe` post-`sf-ux`) and target device preset(s) (`phone`/`tablet`/`pos`/`desktop`) are clear from prompt + upstream state. Pause if fidelity mode (when `06-ui.md` is absent) or target device preset(s) are ambiguous.
+  - *Anti-Patterns:* **Multi-stage bundling** (non-overridable; offer to run `sf-mockery` alone first), requesting production code/`<script>` interactivity, or inventing screens outside `sf-ux`.
+  - *When Weak/Ambiguous:* Pause in 1 turn with: (1) 1–3 gap/anti-pattern bullets, (2) a suggested High-Signal Prompt using known context + `[placeholders]` for unknowns, (3) 2–4 targeted follow-up questions, and (4) options to answer & run, edit/accept prompt, or reply `"proceed anyway"`.
+  - *Override & Upfront Bypass:* Soft gaps are overridable via `"proceed anyway"`, `"use defaults"`, or `"skip prompt check"` (list inferred defaults under **Assumptions Used** in chat without altering manifest headings or `<system_state>`). Missing-Input Guard and multi-stage bundling are never overridable.
 
 ## Mockery Canvas Authoring Rules
 

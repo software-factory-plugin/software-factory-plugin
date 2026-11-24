@@ -21,6 +21,11 @@ description: >-
 - **Stage Boundaries & Gates:**
   - **In scope:** Core user flows, compliance-mapped software rules, integrations directly implied by the BRD, and at least 3 critical edge cases with fallback behavior.
   - **Out of scope:** UI screens, wireframes, visual layouts, or selecting databases, frameworks, or cloud infrastructure.
+- **Prompt Quality Gate (Context-Aware):** Run after resolving `01-vision.md` and `03-brd.md` (exempt targeted revisions of `04-prd.md` or `sf-review` fixes):
+  - *High-Signal Check:* If `01-vision.md` + `03-brd.md` resolve cleanly and no anti-pattern is triggered, concise prompts (e.g., *"Run `sf-prd`"*) pass silently. Pause only if prompt + upstream state leaves core flow priorities, role/permission tiers, or integration boundaries ambiguous, or hits an anti-pattern.
+  - *Anti-Patterns:* **Multi-stage bundling** (non-overridable; offer to run `sf-prd` alone first), stage-boundary bleed (asking for UI layouts, wireframes, or databases/frameworks), or requesting `explicitly_out_of_scope` features.
+  - *When Weak/Ambiguous:* Pause in 1 turn and show: (1) 1–3 brief gap/anti-pattern bullets, (2) a suggested High-Signal Prompt pre-filled with resolved upstream context and explicit `[placeholders]` for unknowns, (3) 2–4 targeted follow-up questions, and (4) three options: answer to tailor & run, edit/accept the prompt, or reply `"proceed anyway"` to override.
+  - *Override & Upfront Bypass:* Soft gaps are overridable via `"proceed anyway"`, `"use defaults"`, or `"skip prompt check"`; when overridden, state inferred defaults in a brief **Assumptions Used** note in chat without altering artifact headings or `<system_state>` schema. Missing-Input Guard and multi-stage bundling are never overridable.
 
 ## Execution Steps
 

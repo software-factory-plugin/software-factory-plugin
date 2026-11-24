@@ -21,6 +21,11 @@ description: >-
 - **Stage Boundaries & Gate:**
   - **Gate:** If `validation_status` in `sf-market-research` is `"Pivot Required"`, **STOP** and confirm with the user whether to proceed or pivot before drafting a BRD.
   - **Scope:** Define monetization, 3-4 primary KPIs, and legal/compliance/budget/timeline constraints grounded strictly in upstream state without adding out-of-scope features, UI flows, or technical architecture.
+- **Prompt Quality Gate (Context-Aware):** Run after resolving `01-vision.md` and `02-market-research.md` (exempt targeted revisions of `03-brd.md` or `sf-review` fixes):
+  - *High-Signal Check:* Pass silently when prompt + upstream state clearly anchors monetization direction, budget/timeline bounds, and compliance scope (or user explicitly asks to propose options). Pause if monetization model and budget/timeline constraints are completely unspecified.
+  - *Anti-Patterns:* **Multi-stage bundling** (e.g., *"do BRD, PRD, UX, and Architecture"*—non-overridable; offer to run `sf-brd` alone first) or stage-boundary bleed (asking for UI flows or tech stack).
+  - *When Weak/Ambiguous:* Pause in 1 turn and show: (1) 1–3 brief gap/anti-pattern bullets, (2) a suggested High-Signal Prompt pre-filled with upstream context and explicit `[placeholders]` for unknowns, (3) 2–4 targeted follow-up questions, and (4) three options: answer to tailor & run, edit/accept the prompt, or reply `"proceed anyway"` to override.
+  - *Override & Upfront Bypass:* Soft gaps are overridable via `"proceed anyway"`, `"use defaults"`, or `"skip prompt check"`; when overridden, state inferred defaults in a brief **Assumptions Used** note in chat without altering artifact headings or `<system_state>` schema. Missing-Input Guard, `"Pivot Required"` gate, and multi-stage bundling are never overridable.
 
 ## Execution Steps
 

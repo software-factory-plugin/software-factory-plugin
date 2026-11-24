@@ -140,7 +140,7 @@ agy plugin validate --strict /path/to/software-factory-plugin
 agy plugin install /path/to/software-factory-plugin
 
 # Or install a pinned version from GitHub
-agy plugin install https://github.com/software-factory-plugin/software-factory-plugin/tree/v0.7.1
+agy plugin install https://github.com/software-factory-plugin/software-factory-plugin/tree/v0.8.0
 ```
 
 Alternatively, register the local directory in `~/.gemini/config/plugins.json` (global) or `.agents/plugins.json` (workspace):
@@ -199,6 +199,7 @@ Active roadmap planning, design specs, and issue tracking live in [Linear (`SOF`
 - **Agile Sizing & Token/Cost Telemetry (Shipped — `v0.5.0`):** On-demand `sf-telemetry` skill and zero-dep Node 20+ CLI pairing Fibonacci sizing (`1, 2, 3, 5, 8`) with offline token/cost pricing, Linear bootstrap & transcript parsers, out-of-repo JSONL storage, and calibration/blowup reports.
 - **Prompting Guide & Evals (Shipped — `v0.6.0`):** Comprehensive operator handbook (`docs/PROMPTING_GUIDE.md`) plus zero-dep Node 20+ automated eval suite (`evals/run.mjs`, golden PulseBoard fixtures, 4 suites, GitHub Actions CI) verifying frontmatter, `<system_state>` fidelity, Missing-Input Guards, `sf-review` vectors, and idle-router token budgets.
 - **Marketplace Publishing (Shipped — `v0.7.0` / `v0.7.1`):** MIT `LICENSE`, minimal SVG logo (`assets/logo.svg`), cross-harness manifests and marketplace registries (Antigravity, Claude Code, OpenAI Codex, Gemini CLI), release version-sync automation, community templates, and zero-warning strict validation.
+- **Built-In Prompt Quality Gate (Shipped — `v0.8.0`):** Context-aware, zero-idle-overhead prompt evaluation embedded across all 12 skills with 1-turn gap diagnosis, placeholder-based High-Signal Prompt suggestions, targeted follow-ups, soft override/upfront bypass support with **Assumptions Used** transparency, and automated contract evals (`153/153` checks).
 
 ## License
 

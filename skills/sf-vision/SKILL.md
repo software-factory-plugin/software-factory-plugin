@@ -16,6 +16,11 @@ Define the unshakeable foundation of a new software project. Extract the core th
 - **Missing-Input Guard:** If the initial idea is missing, or if any required upstream `<system_state>` block is missing or contains invalid JSON, STOP and ask the user to provide it (or offer to run the upstream skill first) — never guess or invent upstream requirements.
 - **Strict Constraint Inheritance:** Adhere strictly to any upstream `hard_constraints` and `explicitly_out_of_scope` items (plus `compliance_requirements` and `budget_or_timeline_constraints` when present).
 - **Stage Boundaries & Gates:** Establish the unshakeable project foundation and discard cruft. Define explicit non-negotiables (`hard_constraints`) and `explicitly_out_of_scope` items so downstream stages cannot boil the ocean.
+- **Prompt Quality Gate (Context-Aware):** Evaluate the prompt before drafting (exempt targeted revisions of an existing `01-vision.md` or explicit `sf-review` fixes):
+  - *High-Signal Signals:* Core problem/concept, `primary_user`, `ux_tone`, at least one `hard_constraints` boundary, and at least one `explicitly_out_of_scope` exclusion.
+  - *Anti-Patterns:* Vague one-liners (e.g., *"Build me a status page app"*) or **multi-stage bundling** (asking to run multiple pipeline stages at once—non-overridable; pause and offer to run `sf-vision` alone first).
+  - *When Weak/Ambiguous:* Pause in 1 turn and show: (1) 1–3 brief gap/anti-pattern bullets, (2) a suggested High-Signal Prompt pre-filled with known context and explicit `[placeholders]` for unknowns (never silently invent requirements), (3) 2–4 targeted follow-up questions covering only those `[placeholders]`, and (4) three options: answer to tailor & run, edit/accept the prompt, or reply `"proceed anyway"` to override.
+  - *Override & Upfront Bypass:* Soft gaps are overridable via `"proceed anyway"`, `"use defaults"`, or `"skip prompt check"`; when overridden, execute and list inferred defaults under a brief **Assumptions Used** note in chat without altering the saved artifact's exact headings or `<system_state>` schema. Hard guards (Missing-Input Guard, multi-stage bundling) are never overridable.
 
 ## Execution Steps
 

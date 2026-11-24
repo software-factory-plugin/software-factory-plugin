@@ -22,6 +22,11 @@ description: >-
 - **Stage Boundaries & Gates:**
   - Write strict pre-implementation API contracts, unit/E2E test case definitions, and linting/security guardrails for an implementation agent or swarm to satisfy.
   - Do NOT write application implementation code or invent endpoints absent from `sf-architecture`.
+- **Prompt Quality Gate (Context-Aware):** Run after resolving `01-vision.md`, `04-prd.md`, and `07-architecture.md` (exempt targeted revisions of `08-specs.md` or `sf-review` fixes):
+  - *High-Signal Check:* If upstream artifacts resolve cleanly and no anti-pattern is triggered, concise prompts (e.g., *"Run `sf-specs`"*) pass silently. Pause only if test runner/framework preferences, auth/error contract conventions, or linter strictness are critically ambiguous for the chosen stack, or an anti-pattern is hit.
+  - *Anti-Patterns:* **Multi-stage bundling** (non-overridable; offer to run `sf-specs` alone first), asking to write production implementation code, or inventing endpoints absent from `sf-architecture`.
+  - *When Weak/Ambiguous:* Pause in 1 turn and show: (1) 1–3 brief gap/anti-pattern bullets, (2) a suggested High-Signal Prompt pre-filled with resolved upstream context and explicit `[placeholders]` for unknowns, (3) 2–4 targeted follow-up questions, and (4) three options: answer to tailor & run, edit/accept the prompt, or reply `"proceed anyway"` to override.
+  - *Override & Upfront Bypass:* Soft gaps are overridable via `"proceed anyway"`, `"use defaults"`, or `"skip prompt check"`; when overridden, state inferred defaults in a brief **Assumptions Used** note in chat without altering artifact headings or `<system_state>` schema. Missing-Input Guard and multi-stage bundling are never overridable.
 
 ## Execution Steps
 

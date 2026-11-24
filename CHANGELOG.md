@@ -2,6 +2,14 @@
 
 All notable changes to `software-factory-plugin` are documented in this file.
 
+## [0.8.0] — 2026-11-24
+
+### Added (Built-In Prompt Quality Gate)
+- Added a tailored, context-aware **Prompt Quality Gate** to all 12 skills (`sf-vision` through `sf-specs`, `sf-mockery`, `sf-review`, `sf-tree`, and `sf-telemetry`) with zero added idle router token overhead (`~1324/1500` est tokens).
+- Downstream skills resolve `docs/factory/` upstream `<system_state>` blocks first so clear concise prompts and targeted revisions pass silently; weak/ambiguous prompts pause in 1 turn with gap diagnosis, a suggested High-Signal Prompt using explicit `[placeholders]`, 2–4 targeted follow-up questions, and soft override/upfront bypass support (`"proceed anyway"`, `"use defaults"`, `"skip prompt check"`) with **Assumptions Used** transparency.
+- Preserved non-overridable hard invariants (Missing-Input Guard, multi-stage bundling prevention, `sf-review` no-rewrite, `sf-tree` read-only, and `sf-telemetry` 8-point epic split gate).
+- Added 12 `guard-prompt-quality-gate:<skill>` automated contract checks in `evals/suites/guards-review.mjs` (`153/153` checks passing) and documented the gate in `docs/PROMPTING_GUIDE.md`.
+
 ## [0.7.1] — 2026-11-24
 
 ### Added (Cross-Harness Marketplace Expansion)

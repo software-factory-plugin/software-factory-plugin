@@ -20,6 +20,11 @@ Provide an instant, strictly read-only interactive view across two complementary
 - **Zero Secret Leakage:** When direct Linear GraphQL mode is used, `LINEAR_API_KEY` is read strictly from `process.env.LINEAR_API_KEY`—never written to disk, logged, or returned in JSON/HTTP responses.
 - **Zero External Dependencies:** All scripts under `<skill_dir>/scripts/` (`cli.mjs`, `analyzer.mjs`, `work-analyzer.mjs`, `linear-adapter.mjs`, `formatters.mjs`, `server.mjs`, `ui.html`) run exclusively on Node.js 20+ stdlib.
 - **Human-in-the-Loop Handoff Gate:** After displaying a snapshot or launching `--serve`, present the recommended next action(s) and wait for the user to choose what to execute.
+- **Prompt Quality Gate (Context-Aware):** Evaluate before running queries or `--serve` (exempt follow-up refinements to an active `sf-tree` view):
+  - *High-Signal Check:* Pass silently when mode (`Work Tech-Tree` vs. `Pipeline Stages`), target scope (workspace `docs/factory/` or Linear team/project/`--work-graph` path), and output (`--mermaid`/`--ascii`/`--json` vs. `--serve`) are clear from prompt + workspace context. Pause on vague prompts (e.g., *"What should I work on?"*) when mode or Linear team/project is ambiguous.
+  - *Anti-Patterns:* Asking `sf-tree` to mutate `docs/factory/`, update Linear tickets, or auto-run downstream authoring stages (non-overridable; offer a read-only view only).
+  - *When Weak/Ambiguous:* Pause in 1 turn with: (1) 1–3 gap/anti-pattern bullets, (2) a suggested High-Signal Prompt with known context + `[placeholders]`, (3) 2–4 targeted follow-up questions, and (4) options to answer & run, edit/accept prompt, or reply `"proceed anyway"`.
+  - *Override & Upfront Bypass:* Soft mode/format ambiguities are overridable via `"proceed anyway"`, `"use defaults"`, or `"skip prompt check"` (note chosen mode/scope under **Assumptions Used** in chat). Read-only and zero-repo-pollution guardrails are never overridable.
 
 ## Operating Modes
 

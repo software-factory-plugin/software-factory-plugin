@@ -18,6 +18,12 @@ const PIPELINE_SKILLS_WITH_STATE = [
   ...DOWNSTREAM_PIPELINE_SKILLS,
 ];
 
+const ALL_SKILLS = [
+  ...PIPELINE_SKILLS_WITH_STATE,
+  "sf-tree",
+  "sf-telemetry",
+];
+
 /**
  * Audit Missing-Input Guard contracts, Input Resolution Order, human-in-the-loop
  * non-auto-advance gates, and sf-review Red Team audit vector completeness.
@@ -118,6 +124,28 @@ export function runGuardsReviewEval(repoRoot) {
     /Zero Idle Token Overhead/i.test(telContent) && /8-Point Epic Split Gate/i.test(telContent),
     "Enforces Zero Idle Token Overhead & 8-Point Epic Split Gate"
   );
+
+  // Prompt Quality Gate contract across all 12 skills
+  for (const skill of ALL_SKILLS) {
+    const content = fs.readFileSync(
+      path.join(repoRoot, "skills", skill, "SKILL.md"),
+      "utf8"
+    );
+    const hasPromptGate =
+      /Prompt Quality Gate/i.test(content) &&
+      /\[placeholders\]/i.test(content) &&
+      /follow-up questions/i.test(content) &&
+      /proceed anyway/i.test(content) &&
+      /Assumptions Used/i.test(content) &&
+      /never overridable/i.test(content);
+    add(
+      `guard-prompt-quality-gate:${skill}`,
+      hasPromptGate,
+      hasPromptGate
+        ? "Enforces context-aware Prompt Quality Gate with placeholders, follow-ups, override disclosure, and non-overridable hard guards"
+        : "Missing or incomplete Prompt Quality Gate contract"
+    );
+  }
 
   return {
     suite: "guards",
