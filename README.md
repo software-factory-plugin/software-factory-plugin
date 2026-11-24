@@ -53,6 +53,7 @@ flowchart LR
 | `sf-specs` | `specs` | `sf-prd`, `sf-architecture`, `sf-vision` | `openapi_stubs`, `required_unit_tests`, `required_e2e_tests`, `linter_rules` | `docs/factory/08-specs.md` |
 | `sf-review` | `review` | 1+ upstream Source artifact(s) + 1 Target artifact | `source_phases`, `target_phase`, `verdict`, `critical_violations_count`, `scope_creep_warnings_count`, `blocking_issues` | `docs/factory/reviews/<source>-vs-<target>-review.md` |
 | `sf-tree` *(read-only)* | *(inspector)* | Workspace `docs/factory/` and/or Linear / `work-graph` v1 JSON | Dual-mode v1 JSON (Work Tech-Tree & Pipeline Stages), Mermaid DAG, ASCII tree, or live web UI | *(read-only; writes zero repo files)* |
+| `sf-telemetry` *(on-demand)* | *(calibration)* | Fibonacci estimate + optional Linear comments or agent JSONL transcript | Canonical v1 JSONL records, Linear closing comments, calibration & blowup reports (`--json`/`--markdown`/`--ascii`) | Out-of-repo `~/.config/software-factory/telemetry/<slug>.jsonl` |
 
 ## Live Project & Tech-Tree View (`sf-tree`)
 
@@ -75,6 +76,22 @@ node skills/sf-tree/scripts/cli.mjs --linear-team SOF --serve --port 4173 --poll
 node skills/sf-tree/scripts/cli.mjs --dir /path/to/repo --view pipeline --json
 node skills/sf-tree/scripts/cli.mjs --dir /path/to/repo --view pipeline --mermaid
 node skills/sf-tree/scripts/cli.mjs --dir /path/to/repo --serve --port 4173
+```
+
+## Agile Sizing & Token/Cost Telemetry (`sf-telemetry`)
+
+Invoke `sf-telemetry` on demand to validate Fibonacci estimates (`1, 2, 3, 5, 8` with mandatory split gate on `8`-pt epics), record model/token/cost/rework telemetry to an out-of-repo JSONL store (`~/.config/software-factory/telemetry/<slug>.jsonl`), import Linear bootstrap telemetry comments or local agent JSONL transcripts, and generate calibration & blowup reports—with **0 hooks**, **0 rules**, and zero external npm dependencies:
+
+```bash
+# Enforce 8-point epic split gate
+node skills/sf-telemetry/scripts/cli.mjs size-check --estimate 5 --json
+
+# Log telemetry (auto-estimates USD from built-in offline pricing table when tokens are given)
+node skills/sf-telemetry/scripts/cli.mjs log --issue SOF-26 --model "Gemini 4 Neon (High)" --estimate 5 --felt 3 --execution smooth
+
+# Import Linear bootstrap comments or local agent JSONL transcript, then generate calibration report
+node skills/sf-telemetry/scripts/cli.mjs import-bootstrap --input /path/to/scratch/comments.json
+node skills/sf-telemetry/scripts/cli.mjs report --markdown
 ```
 
 ## Optional Interactive Mockups (`sf-mockery`)
@@ -147,6 +164,6 @@ Active roadmap planning, design specs, and issue tracking live in [Linear (`SOF`
 
 - **Mockery Integration (Shipped):** Optional `sf-mockery` bridge skill connecting interactive Mockery flow canvases into UX/UI, `sf-review`, and `sf-architecture`.
 - **Live Project & Tech-Tree View (Shipped):** Dual-mode read-only `sf-tree` skill and zero-dep Node 20+ DAG analyzer/live SSE web viewer covering both Work-Item / Linear Dependency Tech-Trees (topological tiers, ready vs. blocked work, Critical Path) and 01–08 Pipeline Stages (staleness blast radius, `sf-review` gates, Mockery parity).
-- **Agile Sizing & Token/Cost Telemetry:** Fibonacci sizing calibration paired with actual LLM token, cost, and rework tracking.
+- **Agile Sizing & Token/Cost Telemetry (Shipped):** On-demand `sf-telemetry` skill and zero-dep Node 20+ CLI pairing Fibonacci sizing (`1, 2, 3, 5, 8`) with offline token/cost pricing, Linear bootstrap & transcript parsers, out-of-repo JSONL storage, and calibration/blowup reports.
 - **Prompting Guide & Evals:** End-to-end prompting handbook and automated evaluation suite for skill output quality and `<system_state>` fidelity.
 - **Marketplace Publishing:** Packaging, validation, and distribution across Antigravity, Claude Code, and Gemini CLI marketplaces.
