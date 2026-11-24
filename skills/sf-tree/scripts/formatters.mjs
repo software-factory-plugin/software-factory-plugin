@@ -235,3 +235,198 @@ export function formatAscii(graph) {
 
   return lines.join("\n");
 }
+
+function workMermaidId(id) {
+  return "W_" + String(id).replace(/[^A-Za-z0-9_]/g, "_");
+}
+
+function truncateLabel(text, maxLen = 42) {
+  const s = String(text || "").replace(/\s+/g, " ").trim();
+  if (s.length <= maxLen) return s;
+  return s.slice(0, maxLen - 1) + "…";
+}
+
+function workStatusLabel(techStatus) {
+  switch (techStatus) {
+    case "done":
+      return "DONE";
+    case "in_review":
+      return "IN REVIEW";
+    case "in_progress":
+      return "IN PROGRESS";
+    case "ready":
+      return "READY";
+    case "blocked":
+      return "BLOCKED";
+    case "canceled":
+      return "CANCELED";
+    default:
+      return String(techStatus || "UNKNOWN").toUpperCase();
+  }
+}
+
+/**
+ * Render a deterministic color-coded Mermaid flowchart LR diagram for a work-graph v1 payload.
+ */
+export function formatWorkMermaid(workGraph) {
+  const lines = ["flowchart LR"];
+  const items = Array.isArray(workGraph.items) ? workGraph.items : [];
+  const edges = Array.isArray(workGraph.edges) ? workGraph.edges : [];
+  const cpIds = workGraph.summary?.critical_path_ids || [];
+
+  const cpEdgeSet = new Set();
+  for (let i = 0; i < cpIds.length - 1; i += 1) {
+    cpEdgeSet.add(`${cpIds[i]}\u0000${cpIds[i + 1]}`);
+  }
+
+  for (const item of items) {
+    const mid = workMermaidId(item.id);
+    const pts = item.estimate !== null && item.estimate !== undefined ? `${item.estimate} pts` : "unest";
+    const cpMark = item.on_critical_path ? " · CP" : "";
+    const label = escapeMermaidLabel(
+      `${item.id}: ${truncateLabel(item.title, 38)}\\n[${workStatusLabel(item.tech_status)} · ${pts}${cpMark}]`
+    );
+    lines.push(`    ${mid}["${label}"]`);
+  }
+
+  for (const edge of edges) {
+    const fromId = workMermaidId(edge.from);
+    const toId = workMermaidId(edge.to);
+    if (cpEdgeSet.has(`${edge.from}\u0000${edge.to}`)) {
+      lines.push(`    ${fromId} ==> ${toId}`);
+    } else {
+      lines.push(`    ${fromId} --> ${toId}`);
+    }
+  }
+
+  lines.push("");
+  lines.push("    classDef done fill:#14532d,stroke:#22c55e,color:#f0fdf4,stroke-width:2px");
+  lines.push("    classDef in_review fill:#3b0764,stroke:#a855f7,color:#faf5ff,stroke-width:2px");
+  lines.push("    classDef in_progress fill:#1e3a8a,stroke:#60a5fa,color:#eff6ff,stroke-width:2px");
+  lines.push("    classDef ready fill:#0f766e,stroke:#2dd4bf,color:#f0fdfa,stroke-width:2px,stroke-dasharray: 4 2");
+  lines.push("    classDef blocked fill:#78350f,stroke:#f59e0b,color:#fffbeb,stroke-width:2px");
+  lines.push("    classDef canceled fill:#1f2937,stroke:#6b7280,color:#9ca3af,stroke-width:1px");
+
+  for (const item of items) {
+    const mid = workMermaidId(item.id);
+    const cls =
+      item.tech_status === "done" ||
+      item.tech_status === "in_review" ||
+      item.tech_status === "in_progress" ||
+      item.tech_status === "ready" ||
+      item.tech_status === "blocked" ||
+      item.tech_status === "canceled"
+        ? item.tech_status
+        : "ready";
+    lines.push(`    class ${mid} ${cls}`);
+  }
+
+  return lines.join("\n");
+}
+
+function workAsciiBadge(techStatus) {
+  switch (techStatus) {
+    case "done":
+      return "DONE";
+    case "in_review":
+      return "REVIEW";
+    case "in_progress":
+      return "ACTIVE";
+    case "ready":
+      return "READY";
+    case "blocked":
+      return "BLOCKED";
+    case "canceled":
+      return "CANCEL";
+    default:
+      return "OPEN";
+  }
+}
+
+/**
+ * Render a deterministic terminal-friendly ASCII Work-Item Tech-Tree.
+ */
+export function formatWorkAscii(workGraph) {
+  const lines = [];
+  const src = workGraph.source || {};
+  const s = workGraph.summary || {};
+  const items = Array.isArray(workGraph.items) ? workGraph.items : [];
+  const projectById = new Map((workGraph.projects || []).map((p) => [p.id, p]));
+  const milestoneById = new Map((workGraph.milestones || []).map((m) => [m.id, m]));
+
+  const scopeLabel = src.team
+    ? `${src.workspace || "workspace"} (${src.team})`
+    : src.workspace || "workspace";
+  lines.push(`Work-Item Tech-Tree — ${scopeLabel} [${src.kind || "local_file"}]`);
+  lines.push(
+    `Items: ${s.total ?? 0} (Done: ${s.done ?? 0} | Review: ${s.in_review ?? 0} | Active: ${s.in_progress ?? 0} | Ready: ${s.ready ?? 0} | Blocked: ${s.blocked ?? 0}) | Points: ${s.completed_points ?? 0}/${s.total_points ?? 0} (${s.remaining_points ?? 0} rem)`
+  );
+  if (Array.isArray(s.critical_path_ids) && s.critical_path_ids.length > 0) {
+    lines.push(
+      `Critical Path (${s.critical_path_points ?? 0} pts): ${s.critical_path_ids.join(" -> ")}`
+    );
+  } else {
+    lines.push("Critical Path: none (no remaining uncompleted items)");
+  }
+
+  if (Array.isArray(s.cycle_warnings) && s.cycle_warnings.length > 0) {
+    for (const warn of s.cycle_warnings) {
+      lines.push(`! cycle warning: ${warn}`);
+    }
+  }
+
+  lines.push("=".repeat(96));
+
+  if (items.length === 0) {
+    lines.push("(No work items found)");
+    return lines.join("\n");
+  }
+
+  // Group by topological tier
+  const tiers = new Map();
+  for (const item of items) {
+    const t = typeof item.tier === "number" ? item.tier : 0;
+    if (!tiers.has(t)) tiers.set(t, []);
+    tiers.get(t).push(item);
+  }
+
+  const sortedTierKeys = [...tiers.keys()].sort((a, b) => a - b);
+  for (const tier of sortedTierKeys) {
+    lines.push(`Tier ${tier}`);
+    for (const item of tiers.get(tier)) {
+      const idCol = padRight(item.id, 10);
+      const badgeCol = padRight(`[${workAsciiBadge(item.tech_status)}]`, 11);
+      const ptsCol = padRight(
+        item.estimate !== null && item.estimate !== undefined ? `${item.estimate}p` : "-",
+        4
+      );
+      const cpCol = item.on_critical_path ? "*CP " : "    ";
+      const proj = item.project_id ? projectById.get(item.project_id)?.name : null;
+      const ms = item.milestone_id ? milestoneById.get(item.milestone_id)?.name : null;
+      const scopeHint = [proj, ms].filter(Boolean).join(" / ");
+      lines.push(
+        `  ${idCol}${badgeCol}${ptsCol}${cpCol}${truncateLabel(item.title, 62)}`
+      );
+      if (scopeHint) {
+        lines.push(`      scope:   ${scopeHint}`);
+      }
+      if (item.blocked_by && item.blocked_by.length > 0) {
+        lines.push(`      blocked: <- ${item.blocked_by.join(", ")}`);
+      }
+      if (item.blocks && item.blocks.length > 0) {
+        lines.push(`      unlocks: -> ${item.blocks.join(", ")}`);
+      }
+    }
+  }
+
+  const readyItems = items.filter((it) => it.tech_status === "ready");
+  if (readyItems.length > 0) {
+    lines.push("-".repeat(96));
+    lines.push("Ready / Unlocked Next Work:");
+    for (const item of readyItems) {
+      lines.push(`  - [${item.id}] ${item.next_prompt}`);
+    }
+  }
+
+  return lines.join("\n");
+}
