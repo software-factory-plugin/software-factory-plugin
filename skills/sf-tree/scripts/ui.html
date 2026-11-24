@@ -38,6 +38,10 @@
       --unrev-border: #2563eb;
       --unrev-text: #1e3a8a;
 
+      --review-bg: #f3e8ff;
+      --review-border: #9333ea;
+      --review-text: #581c87;
+
       --unlock-bg: #ccfbf1;
       --unlock-border: #0d9488;
       --unlock-text: #115e59;
@@ -100,6 +104,10 @@
         --unrev-border: #60a5fa;
         --unrev-text: #bfdbfe;
 
+        --review-bg: rgba(147, 51, 234, 0.22);
+        --review-border: #c084fc;
+        --review-text: #e9d5ff;
+
         --unlock-bg: rgba(13, 148, 136, 0.22);
         --unlock-border: #2dd4bf;
         --unlock-text: #99f6e4;
@@ -156,6 +164,10 @@
       --unrev-border: #60a5fa;
       --unrev-text: #bfdbfe;
 
+      --review-bg: rgba(147, 51, 234, 0.22);
+      --review-border: #c084fc;
+      --review-text: #e9d5ff;
+
       --unlock-bg: rgba(13, 148, 136, 0.22);
       --unlock-border: #2dd4bf;
       --unlock-text: #99f6e4;
@@ -197,6 +209,8 @@
       height: 100vh;
       overflow: hidden;
     }
+
+    .hidden { display: none !important; }
 
     /* Top summary bar */
     .topbar {
@@ -240,13 +254,13 @@
     }
 
     .project-title {
-      font-size: 15px;
+      font-size: 14.5px;
       font-weight: 700;
       line-height: 1.2;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: 280px;
+      max-width: 240px;
     }
 
     .project-sub {
@@ -256,7 +270,38 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: 300px;
+      max-width: 260px;
+    }
+
+    /* Segmented View Switcher */
+    .view-switcher {
+      display: inline-flex;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 2px;
+      gap: 2px;
+    }
+
+    .view-btn {
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 600;
+      font-family: inherit;
+      padding: 5px 11px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+
+    .view-btn:hover { color: var(--text); }
+
+    .view-btn.active {
+      background: var(--surface);
+      color: var(--accent-text);
+      box-shadow: var(--shadow-sm);
     }
 
     .summary-metrics {
@@ -303,6 +348,12 @@
       color: var(--unlock-text);
     }
 
+    .metric-pill.has-active {
+      background: var(--unrev-bg);
+      border-color: var(--unrev-border);
+      color: var(--unrev-text);
+    }
+
     .progress-bar-track {
       width: 56px;
       height: 6px;
@@ -325,6 +376,63 @@
       flex-wrap: wrap;
     }
 
+    /* Work Tech-Tree Sub-Toolbar */
+    .work-subbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 8px 16px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border-subtle);
+      flex-wrap: wrap;
+      z-index: 15;
+    }
+
+    .work-filters-left, .work-filters-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .scope-select {
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 5px 10px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+      max-width: 280px;
+      cursor: pointer;
+    }
+
+    .filter-pill {
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-muted);
+      font-size: 11.5px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+    }
+
+    .filter-pill:hover {
+      background: var(--surface-2);
+      color: var(--text);
+    }
+
+    .filter-pill.active {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+      color: var(--accent-text);
+    }
+
     .btn {
       display: inline-flex;
       align-items: center;
@@ -338,14 +446,14 @@
       font-weight: 600;
       font-family: inherit;
       cursor: pointer;
+      text-decoration: none;
       transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
     }
 
-    .btn:hover {
-      background: var(--surface-2);
-    }
+    .btn:hover { background: var(--surface-2); }
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
-    .btn:focus-visible {
+    .btn:focus-visible, .filter-pill:focus-visible, .view-btn:focus-visible, .scope-select:focus-visible {
       outline: none;
       box-shadow: var(--shadow-focus);
     }
@@ -468,13 +576,8 @@
       stroke-dasharray: 6 4;
     }
 
-    .dag-edge.edge-skip {
-      opacity: 0.32;
-    }
-
-    .dag-edge.dimmed {
-      opacity: 0.1 !important;
-    }
+    .dag-edge.edge-skip { opacity: 0.32; }
+    .dag-edge.dimmed { opacity: 0.1 !important; }
 
     .dag-edge.edge-upstream {
       stroke: var(--edge-upstream) !important;
@@ -494,7 +597,22 @@
       opacity: 1 !important;
     }
 
-    /* Node Cards */
+    .tier-header {
+      position: absolute;
+      top: 10px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-faint);
+      background: var(--surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 999px;
+      padding: 3px 10px;
+      pointer-events: none;
+    }
+
+    /* Pipeline & Work Node Cards */
     .dag-node {
       position: absolute;
       width: 196px;
@@ -512,6 +630,12 @@
       user-select: none;
     }
 
+    .dag-node.work-node {
+      width: 224px;
+      min-height: 112px;
+      border-left-width: 5px;
+    }
+
     .dag-node:hover {
       transform: translateY(-2px);
       box-shadow: var(--shadow-md);
@@ -522,10 +646,9 @@
       box-shadow: var(--shadow-focus);
     }
 
-    .dag-node.optional-node {
-      border-style: dashed;
-    }
+    .dag-node.optional-node { border-style: dashed; }
 
+    /* Pipeline statuses */
     .dag-node.status-reviewed_pass { border-color: var(--pass-border); }
     .dag-node.status-reviewed_fail { border-color: var(--fail-border); }
     .dag-node.status-unreviewed { border-color: var(--unrev-border); }
@@ -534,15 +657,21 @@
     .dag-node.status-invalid { border-color: var(--invalid-border); }
     .dag-node.is-stale { border-color: var(--stale-border); }
 
+    /* Work statuses */
+    .dag-node.wstatus-done { border-color: var(--pass-border); }
+    .dag-node.wstatus-in_review { border-color: var(--review-border); }
+    .dag-node.wstatus-in_progress { border-color: var(--unrev-border); }
+    .dag-node.wstatus-ready { border-color: var(--unlock-border); }
+    .dag-node.wstatus-blocked { border-color: var(--stale-border); opacity: 0.88; }
+    .dag-node.wstatus-canceled { border-color: var(--lock-border); opacity: 0.55; }
+
     .dag-node.selected {
       box-shadow: 0 0 0 3px var(--accent), var(--shadow-md);
       z-index: 5;
       opacity: 1;
     }
 
-    .dag-node.dimmed {
-      opacity: 0.28;
-    }
+    .dag-node.dimmed { opacity: 0.25; }
 
     .dag-node.node-upstream {
       box-shadow: 0 0 0 2px var(--edge-upstream), var(--shadow-sm);
@@ -594,6 +723,17 @@
       color: var(--text);
     }
 
+    .work-title {
+      font-size: 12.5px;
+      font-weight: 700;
+      line-height: 1.3;
+      color: var(--text);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
     .node-file {
       font-size: 10.5px;
       font-family: var(--font-mono);
@@ -627,10 +767,27 @@
     .badge-fail { background: var(--fail-bg); color: var(--fail-text); border-color: var(--fail-border); }
     .badge-stale { background: var(--stale-bg); color: var(--stale-text); border-color: var(--stale-border); }
     .badge-unreviewed { background: var(--unrev-bg); color: var(--unrev-text); border-color: var(--unrev-border); }
+    .badge-review { background: var(--review-bg); color: var(--review-text); border-color: var(--review-border); }
     .badge-unlocked { background: var(--unlock-bg); color: var(--unlock-text); border-color: var(--unlock-border); }
     .badge-locked { background: var(--lock-bg); color: var(--lock-text); border-color: var(--lock-border); }
     .badge-invalid { background: var(--invalid-bg); color: var(--invalid-text); border-color: var(--invalid-border); }
     .badge-neutral { background: var(--surface-2); color: var(--text-muted); border-color: var(--border); }
+
+    .work-empty-canvas {
+      max-width: 480px;
+      margin: 48px auto;
+      padding: 20px 24px;
+      background: var(--surface);
+      border: 1px dashed var(--border);
+      border-radius: var(--radius-md);
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .work-empty-canvas h3 { margin: 0; font-size: 15px; }
+    .work-empty-canvas p { margin: 0; font-size: 12.5px; color: var(--text-muted); line-height: 1.5; }
 
     /* Canvas footer controls & legend */
     .canvas-footer {
@@ -649,7 +806,7 @@
     .legend-items {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
       flex-wrap: wrap;
     }
 
@@ -670,6 +827,10 @@
       border-top-color: var(--text-faint);
     }
 
+    .legend-line.cp {
+      border-top: 3px solid var(--edge-blast);
+    }
+
     .zoom-controls {
       display: flex;
       align-items: center;
@@ -678,9 +839,9 @@
 
     /* Side Inspector Drawer */
     .inspector {
-      width: 430px;
+      width: 440px;
       max-width: 46vw;
-      min-width: 320px;
+      min-width: 330px;
       background: var(--surface);
       border-left: 1px solid var(--border-subtle);
       display: flex;
@@ -706,15 +867,22 @@
 
     .inspector-title {
       margin: 0;
-      font-size: 16px;
+      font-size: 15.5px;
       font-weight: 700;
-      line-height: 1.25;
+      line-height: 1.3;
     }
 
     .inspector-sub {
       font-size: 12px;
       color: var(--text-muted);
       font-family: var(--font-mono);
+    }
+
+    .inspector-actions-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
     }
 
     /* Copy Prompt Action Card */
@@ -774,9 +942,7 @@
       cursor: pointer;
     }
 
-    .tab-btn:hover {
-      color: var(--text);
-    }
+    .tab-btn:hover { color: var(--text); }
 
     .tab-btn.active {
       color: var(--accent-text);
@@ -800,16 +966,8 @@
       line-height: 1.45;
     }
 
-    .alert-card h4 {
-      margin: 0 0 6px;
-      font-size: 12px;
-      font-weight: 700;
-    }
-
-    .alert-card ul {
-      margin: 0;
-      padding-left: 18px;
-    }
+    .alert-card h4 { margin: 0 0 6px; font-size: 12px; font-weight: 700; }
+    .alert-card ul { margin: 0; padding-left: 18px; }
 
     .alert-card.alert-error {
       background: var(--fail-bg);
@@ -817,19 +975,19 @@
       color: var(--fail-text);
     }
 
-    .alert-card.alert-stale {
+    .alert-card.alert-stale, .alert-card.alert-warn {
       background: var(--stale-bg);
       border-color: var(--stale-border);
       color: var(--stale-text);
     }
 
-    .alert-card.alert-warn {
-      background: var(--stale-bg);
-      border-color: var(--stale-border);
-      color: var(--stale-text);
+    /* Structured State Cards & Work Metadata Grid */
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
     }
 
-    /* Structured State Cards */
     .kv-list {
       display: flex;
       flex-direction: column;
@@ -844,9 +1002,11 @@
     }
 
     .kv-key {
-      font-size: 11px;
+      font-size: 10.5px;
       font-weight: 700;
       font-family: var(--font-mono);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
       color: var(--text-muted);
       margin-bottom: 4px;
     }
@@ -858,10 +1018,7 @@
       word-break: break-word;
     }
 
-    .kv-value ul {
-      margin: 0;
-      padding-left: 18px;
-    }
+    .kv-value ul { margin: 0; padding-left: 18px; }
 
     .kv-pre {
       margin: 0;
@@ -874,6 +1031,42 @@
       border-radius: 4px;
       padding: 8px;
       overflow-x: auto;
+    }
+
+    .jump-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .jump-btn {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      width: 100%;
+      padding: 7px 10px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 12px;
+      font-family: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .jump-btn:hover {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+    }
+
+    .jump-btn-title {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     details.raw-json-details {
@@ -915,16 +1108,8 @@
       text-align: center;
     }
 
-    .mockery-stat-val {
-      font-size: 15px;
-      font-weight: 700;
-    }
-
-    .mockery-stat-lbl {
-      font-size: 10px;
-      color: var(--text-muted);
-      text-transform: uppercase;
-    }
+    .mockery-stat-val { font-size: 15px; font-weight: 700; }
+    .mockery-stat-lbl { font-size: 10px; color: var(--text-muted); text-transform: uppercase; }
 
     .cmd-row {
       display: flex;
@@ -945,11 +1130,7 @@
       white-space: nowrap;
     }
 
-    .cmd-row .btn {
-      padding: 5px 8px;
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
+    .cmd-row .btn { padding: 5px 8px; white-space: nowrap; flex-shrink: 0; }
 
     .preview-input {
       flex: 1;
@@ -963,20 +1144,12 @@
     }
 
     /* Safe Narrative Markdown Styling */
-    .md-view {
-      font-size: 13px;
-      line-height: 1.6;
-      color: var(--text);
-    }
-
-    .md-view h1, .md-view h2, .md-view h3, .md-view h4 {
-      margin: 14px 0 6px;
-      line-height: 1.3;
-    }
-    .md-view h1 { font-size: 18px; }
-    .md-view h2 { font-size: 15.5px; }
-    .md-view h3 { font-size: 14px; }
-    .md-view h4 { font-size: 13px; }
+    .md-view { font-size: 13px; line-height: 1.6; color: var(--text); }
+    .md-view h1, .md-view h2, .md-view h3, .md-view h4 { margin: 14px 0 6px; line-height: 1.3; }
+    .md-view h1 { font-size: 17px; }
+    .md-view h2 { font-size: 15px; }
+    .md-view h3 { font-size: 13.5px; }
+    .md-view h4 { font-size: 12.5px; }
     .md-view p { margin: 0 0 10px; }
     .md-view ul, .md-view ol { margin: 0 0 10px; padding-left: 20px; }
     .md-view li { margin-bottom: 4px; }
@@ -1002,34 +1175,12 @@
       overflow-x: auto;
       margin: 0 0 10px;
     }
-    .md-view pre code {
-      background: transparent;
-      padding: 0;
-    }
-    .md-view table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 0 0 12px;
-      font-size: 12px;
-    }
-    .md-view th, .md-view td {
-      border: 1px solid var(--border);
-      padding: 5px 8px;
-      text-align: left;
-    }
-    .md-view th {
-      background: var(--surface-2);
-      font-weight: 700;
-    }
-    .md-view a {
-      color: var(--accent-text);
-      text-decoration: underline;
-    }
-    .md-view hr {
-      border: none;
-      border-top: 1px solid var(--border-subtle);
-      margin: 12px 0;
-    }
+    .md-view pre code { background: transparent; padding: 0; }
+    .md-view table { width: 100%; border-collapse: collapse; margin: 0 0 12px; font-size: 12px; }
+    .md-view th, .md-view td { border: 1px solid var(--border); padding: 5px 8px; text-align: left; }
+    .md-view th { background: var(--surface-2); font-weight: 700; }
+    .md-view a { color: var(--accent-text); text-decoration: underline; }
+    .md-view hr { border: none; border-top: 1px solid var(--border-subtle); margin: 12px 0; }
 
     /* Reviews List */
     .review-card {
@@ -1109,12 +1260,17 @@
       <div class="brand-group">
         <div class="brand-mark" aria-hidden="true">SF</div>
         <div class="project-meta">
-          <div id="project-name" class="project-title">Loading project…</div>
-          <div id="workspace-root" class="project-sub">docs/factory</div>
+          <div id="project-name" class="project-title">Loading…</div>
+          <div id="workspace-root" class="project-sub">sf-tree</div>
+        </div>
+        <div class="view-switcher" role="tablist" aria-label="View Mode">
+          <button type="button" id="btn-view-work" class="view-btn" role="tab" aria-selected="false">Work Tech-Tree</button>
+          <button type="button" id="btn-view-pipeline" class="view-btn active" role="tab" aria-selected="true">Pipeline Stages</button>
         </div>
       </div>
 
-      <div class="summary-metrics" id="summary-metrics">
+      <!-- Pipeline Summary Metrics -->
+      <div class="summary-metrics" id="pipeline-metrics">
         <span class="metric-pill" id="metric-core">
           <span id="metric-core-text">0/8 Core</span>
           <span class="progress-bar-track"><span id="metric-core-fill" class="progress-bar-fill" style="width:0%"></span></span>
@@ -1125,9 +1281,27 @@
         <span class="metric-pill" id="metric-invalid" style="display:none">Invalid: 0</span>
       </div>
 
+      <!-- Work Tech-Tree Summary Metrics -->
+      <div class="summary-metrics hidden" id="work-metrics">
+        <span class="metric-pill" id="wmetric-done">
+          <span id="wmetric-done-text">0/0 Done</span>
+          <span class="progress-bar-track"><span id="wmetric-done-fill" class="progress-bar-fill" style="width:0%"></span></span>
+        </span>
+        <span class="metric-pill" id="wmetric-ready">Ready: 0</span>
+        <span class="metric-pill" id="wmetric-active">Active: 0</span>
+        <span class="metric-pill" id="wmetric-blocked">Blocked: 0</span>
+        <span class="metric-pill" id="wmetric-cp">Critical Path: 0 pts</span>
+      </div>
+
       <div class="toolbar-controls">
+        <!-- Pipeline-only controls -->
         <button type="button" id="btn-toggle-mockery" class="btn active-toggle" aria-pressed="true">Show Mockery (6b)</button>
         <button type="button" id="btn-toggle-blast" class="btn" aria-pressed="false">Highlight Stale Blast Radius</button>
+
+        <!-- Work-only controls -->
+        <button type="button" id="btn-toggle-cp" class="btn hidden" aria-pressed="false">Highlight Critical Path</button>
+        <button type="button" id="btn-work-refresh" class="btn hidden">Refresh</button>
+
         <button type="button" id="btn-theme" class="btn" title="Toggle light/dark theme">Theme</button>
         <span id="sse-pill" class="sse-pill" data-state="reconnecting" role="status" aria-live="polite">
           <span class="sse-dot"></span>
@@ -1136,25 +1310,36 @@
       </div>
     </header>
 
+    <!-- Work Tech-Tree Filter Bar -->
+    <div id="work-subbar" class="work-subbar hidden" aria-label="Work Tech-Tree Filters">
+      <div class="work-filters-left">
+        <label for="scope-select" class="inspector-sub">Scope:</label>
+        <select id="scope-select" class="scope-select" aria-label="Filter by Project or Milestone">
+          <option value="all">All Active Projects</option>
+        </select>
+
+        <button type="button" class="filter-pill active" data-wfilter="all" aria-pressed="true">All</button>
+        <button type="button" class="filter-pill" data-wfilter="ready" aria-pressed="false">Ready to Start</button>
+        <button type="button" class="filter-pill" data-wfilter="active" aria-pressed="false">In Progress</button>
+        <button type="button" class="filter-pill" data-wfilter="blocked" aria-pressed="false">Blocked</button>
+        <button type="button" id="btn-hide-done" class="filter-pill" aria-pressed="false">Hide Done</button>
+      </div>
+      <div class="work-filters-right">
+        <span id="work-scope-points" class="inspector-sub"></span>
+      </div>
+    </div>
+
     <main class="workspace">
-      <section class="canvas-pane" aria-label="Pipeline Tech-Tree DAG">
+      <section class="canvas-pane" aria-label="Interactive Tech-Tree DAG">
         <div id="canvas-scroller" class="canvas-scroller">
           <div id="dag-stage" class="dag-stage">
             <svg id="dag-edges" class="dag-edges-svg" aria-hidden="true"></svg>
             <div id="dag-nodes"></div>
           </div>
+          <div id="work-empty-host"></div>
         </div>
         <div class="canvas-footer">
-          <div class="legend-items">
-            <span class="legend-item"><span class="legend-line"></span> Required edge</span>
-            <span class="legend-item"><span class="legend-line dashed"></span> Recommended / Optional</span>
-            <span class="legend-item"><span class="badge badge-pass">PASS</span></span>
-            <span class="legend-item"><span class="badge badge-fail">FAIL</span></span>
-            <span class="legend-item"><span class="badge badge-stale">STALE</span></span>
-            <span class="legend-item"><span class="badge badge-unreviewed">UNREVIEWED</span></span>
-            <span class="legend-item"><span class="badge badge-unlocked">UNLOCKED</span></span>
-            <span class="legend-item"><span class="badge badge-locked">LOCKED</span></span>
-          </div>
+          <div class="legend-items" id="legend-items"></div>
           <div class="zoom-controls">
             <button type="button" id="btn-zoom-out" class="btn" aria-label="Zoom out">-</button>
             <button type="button" id="btn-zoom-fit" class="btn">Fit</button>
@@ -1164,9 +1349,9 @@
         </div>
       </section>
 
-      <aside class="inspector" aria-label="Stage Inspector">
+      <aside class="inspector" aria-label="Inspector Drawer">
         <div class="inspector-header" id="inspector-header"></div>
-        <div class="tab-bar" role="tablist">
+        <div class="tab-bar" id="pipeline-tab-bar" role="tablist">
           <button type="button" class="tab-btn active" role="tab" data-tab="overview" aria-selected="true">Overview / &lt;system_state&gt;</button>
           <button type="button" class="tab-btn" role="tab" data-tab="narrative" aria-selected="false">Narrative</button>
           <button type="button" class="tab-btn" role="tab" data-tab="reviews" aria-selected="false" id="tab-btn-reviews">Reviews</button>
@@ -1182,14 +1367,15 @@
     (function () {
       "use strict";
 
-      const NODE_W = 196;
-      const NODE_H = 114;
-      const COL_GAP = 40;
-      const PAD_X = 24;
-      const PAD_Y = 74;
-      const ROW_GAP = 72;
+      // Pipeline layout constants
+      const P_NODE_W = 196;
+      const P_NODE_H = 114;
+      const P_COL_GAP = 40;
+      const P_PAD_X = 24;
+      const P_PAD_Y = 74;
+      const P_ROW_GAP = 72;
 
-      const LAYOUT = {
+      const PIPELINE_LAYOUT = {
         vision: { col: 0, row: 0 },
         "market-research": { col: 1, row: 0 },
         brd: { col: 2, row: 0 },
@@ -1201,40 +1387,96 @@
         specs: { col: 7, row: 0 },
       };
 
+      // Work Tech-Tree layout constants
+      const W_NODE_W = 224;
+      const W_NODE_H = 114;
+      const W_COL_GAP = 56;
+      const W_ROW_GAP = 22;
+      const W_PAD_X = 28;
+      const W_PAD_Y = 52;
+
+      const PRIORITY_NAMES = {
+        0: "None",
+        1: "Urgent",
+        2: "High",
+        3: "Medium",
+        4: "Low",
+      };
+
       const state = {
+        viewMode: "pipeline", // "work" | "pipeline"
+        userPickedView: false,
+
+        // Pipeline state
         graph: null,
         selectedPhase: null,
         hoveredPhase: null,
         activeTab: "overview",
         showMockery: true,
         highlightBlast: false,
-        zoom: 1,
-        artifactCache: new Map(), // phase -> { mtimeMs, data }
-        reviewCache: new Map(),   // filename -> { mtimeMs, data }
+        artifactCache: new Map(),
+        reviewCache: new Map(),
         expandedReviews: new Set(),
         mockeryPreviewUrl:
           safeStorageGet("sf-tree-mockery-url") || "http://127.0.0.1:4174",
+
+        // Work Tech-Tree state
+        workEnvelope: null, // { available, default_view, graph, error? }
+        selectedWorkId: null,
+        hoveredWorkId: null,
+        workScope: "all", // "all" | "project:<id>" | "milestone:<id>"
+        workFilter: "all", // "all" | "ready" | "active" | "blocked"
+        hideDone: false,
+        highlightCriticalPath: false,
+        workRects: new Map(),
+
+        zoom: 1,
       };
 
       const els = {
         projectName: document.getElementById("project-name"),
         workspaceRoot: document.getElementById("workspace-root"),
+        btnViewWork: document.getElementById("btn-view-work"),
+        btnViewPipeline: document.getElementById("btn-view-pipeline"),
+
+        pipelineMetrics: document.getElementById("pipeline-metrics"),
         metricCoreText: document.getElementById("metric-core-text"),
         metricCoreFill: document.getElementById("metric-core-fill"),
         metricUnlocked: document.getElementById("metric-unlocked"),
         metricStale: document.getElementById("metric-stale"),
         metricFail: document.getElementById("metric-fail"),
         metricInvalid: document.getElementById("metric-invalid"),
+
+        workMetrics: document.getElementById("work-metrics"),
+        wmetricDoneText: document.getElementById("wmetric-done-text"),
+        wmetricDoneFill: document.getElementById("wmetric-done-fill"),
+        wmetricReady: document.getElementById("wmetric-ready"),
+        wmetricActive: document.getElementById("wmetric-active"),
+        wmetricBlocked: document.getElementById("wmetric-blocked"),
+        wmetricCp: document.getElementById("wmetric-cp"),
+
         btnMockery: document.getElementById("btn-toggle-mockery"),
         btnBlast: document.getElementById("btn-toggle-blast"),
+        btnCp: document.getElementById("btn-toggle-cp"),
+        btnWorkRefresh: document.getElementById("btn-work-refresh"),
         btnTheme: document.getElementById("btn-theme"),
         ssePill: document.getElementById("sse-pill"),
         sseLabel: document.getElementById("sse-label"),
+
+        workSubbar: document.getElementById("work-subbar"),
+        scopeSelect: document.getElementById("scope-select"),
+        btnHideDone: document.getElementById("btn-hide-done"),
+        workScopePoints: document.getElementById("work-scope-points"),
+
         canvasScroller: document.getElementById("canvas-scroller"),
         dagStage: document.getElementById("dag-stage"),
         dagEdges: document.getElementById("dag-edges"),
         dagNodes: document.getElementById("dag-nodes"),
+        workEmptyHost: document.getElementById("work-empty-host"),
+        legendItems: document.getElementById("legend-items"),
+
         inspectorHeader: document.getElementById("inspector-header"),
+        pipelineTabBar: document.getElementById("pipeline-tab-bar"),
         inspectorBody: document.getElementById("inspector-body"),
         tabBtnReviews: document.getElementById("tab-btn-reviews"),
         toast: document.getElementById("toast"),
@@ -1245,6 +1487,35 @@
       }
       function safeStorageSet(key, val) {
         try { localStorage.setItem(key, val); } catch {}
+      }
+
+      function el(tag, className, text) {
+        const node = document.createElement(tag);
+        if (className) node.className = className;
+        if (text !== undefined && text !== null) node.textContent = String(text);
+        return node;
+      }
+
+      function sanitizeExternalHttpsUrl(urlStr) {
+        if (typeof urlStr !== "string" || !urlStr.trim()) return null;
+        try {
+          const u = new URL(urlStr.trim());
+          if (u.protocol === "https:") return u.href;
+        } catch {}
+        return null;
+      }
+
+      function sanitizePreviewUrl(urlStr) {
+        try {
+          const u = new URL(urlStr);
+          if (
+            (u.protocol === "http:" || u.protocol === "https:") &&
+            (u.hostname === "127.0.0.1" || u.hostname === "localhost")
+          ) {
+            return u.href;
+          }
+        } catch {}
+        return null;
       }
 
       // Theme initialization
@@ -1305,14 +1576,1012 @@
         }
       }
 
-      function el(tag, className, text) {
-        const node = document.createElement(tag);
-        if (className) node.className = className;
-        if (text !== undefined && text !== null) node.textContent = String(text);
-        return node;
+      // Safe DOM-only Markdown Renderer (zero innerHTML)
+      function renderSafeInline(container, text) {
+        const tokenRe = /(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|\[([^\]]+)\]\(((?:[^()]+|\([^()]*\))+)\))/g;
+        let lastIdx = 0;
+        let match;
+
+        while ((match = tokenRe.exec(text)) !== null) {
+          if (match.index > lastIdx) {
+            container.appendChild(document.createTextNode(text.slice(lastIdx, match.index)));
+          }
+          const tok = match[0];
+          if (tok.startsWith("`")) {
+            container.appendChild(el("code", "", tok.slice(1, -1)));
+          } else if (tok.startsWith("**")) {
+            container.appendChild(el("strong", "", tok.slice(2, -2)));
+          } else if (tok.startsWith("*")) {
+            container.appendChild(el("em", "", tok.slice(1, -1)));
+          } else if (tok.startsWith("[")) {
+            const linkText = match[2];
+            const rawHref = match[3].trim().replace(/^<|>$/g, "");
+            let safeHref = null;
+            try {
+              const parsed = new URL(rawHref);
+              if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+                safeHref = parsed.href;
+              }
+            } catch {}
+            if (safeHref) {
+              const a = el("a", "", linkText);
+              a.href = safeHref;
+              a.target = "_blank";
+              a.rel = "noopener noreferrer";
+              container.appendChild(a);
+            } else {
+              container.appendChild(document.createTextNode(linkText));
+            }
+          }
+          lastIdx = tokenRe.lastIndex;
+        }
+
+        if (lastIdx < text.length) {
+          container.appendChild(document.createTextNode(text.slice(lastIdx)));
+        }
       }
 
-      function badgeForStatus(status) {
+      function renderSafeMarkdown(markdown) {
+        const root = el("div", "md-view");
+        const lines = String(markdown || "").replace(/\r\n/g, "\n").split("\n");
+        let i = 0;
+
+        while (i < lines.length) {
+          const line = lines[i];
+          if (!line.trim()) { i += 1; continue; }
+
+          if (line.trim().startsWith("```")) {
+            const codeLines = [];
+            i += 1;
+            while (i < lines.length && !lines[i].trim().startsWith("```")) {
+              codeLines.push(lines[i]);
+              i += 1;
+            }
+            if (i < lines.length) i += 1;
+            const pre = el("pre");
+            pre.appendChild(el("code", "", codeLines.join("\n")));
+            root.appendChild(pre);
+            continue;
+          }
+
+          if (/^(\s*[-*_]\s*){3,}$/.test(line)) {
+            root.appendChild(el("hr"));
+            i += 1;
+            continue;
+          }
+
+          const hMatch = line.match(/^(#{1,4})\s+(.*)$/);
+          if (hMatch) {
+            const hEl = el(`h${hMatch[1].length}`);
+            renderSafeInline(hEl, hMatch[2].trim());
+            root.appendChild(hEl);
+            i += 1;
+            continue;
+          }
+
+          if (line.trim().startsWith(">")) {
+            const bq = el("blockquote");
+            const bqLines = [];
+            while (i < lines.length && lines[i].trim().startsWith(">")) {
+              bqLines.push(lines[i].trim().replace(/^>\s?/, ""));
+              i += 1;
+            }
+            const p = el("p");
+            renderSafeInline(p, bqLines.join(" "));
+            bq.appendChild(p);
+            root.appendChild(bq);
+            continue;
+          }
+
+          if (
+            line.includes("|") &&
+            i + 1 < lines.length &&
+            /^\s*\|?[\s:-]+\|[\s|:-]*$/.test(lines[i + 1])
+          ) {
+            const parseRow = (r) =>
+              r.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
+            const headers = parseRow(line);
+            i += 2;
+            const table = el("table");
+            const thead = el("thead");
+            const hTr = el("tr");
+            headers.forEach((h) => {
+              const th = el("th");
+              renderSafeInline(th, h);
+              hTr.appendChild(th);
+            });
+            thead.appendChild(hTr);
+            table.appendChild(thead);
+
+            const tbody = el("tbody");
+            while (i < lines.length && lines[i].includes("|") && lines[i].trim()) {
+              const cells = parseRow(lines[i]);
+              const tr = el("tr");
+              cells.forEach((c) => {
+                const td = el("td");
+                renderSafeInline(td, c);
+                tr.appendChild(td);
+              });
+              tbody.appendChild(tr);
+              i += 1;
+            }
+            table.appendChild(tbody);
+            root.appendChild(table);
+            continue;
+          }
+
+          if (/^\s*[-*+]\s+/.test(line)) {
+            const ul = el("ul");
+            while (i < lines.length && /^\s*[-*+]\s+/.test(lines[i])) {
+              const li = el("li");
+              renderSafeInline(li, lines[i].replace(/^\s*[-*+]\s+/, ""));
+              ul.appendChild(li);
+              i += 1;
+            }
+            root.appendChild(ul);
+            continue;
+          }
+
+          if (/^\s*\d+\.\s+/.test(line)) {
+            const ol = el("ol");
+            while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) {
+              const li = el("li");
+              renderSafeInline(li, lines[i].replace(/^\s*\d+\.\s+/, ""));
+              ol.appendChild(li);
+              i += 1;
+            }
+            root.appendChild(ol);
+            continue;
+          }
+
+          const pLines = [];
+          while (
+            i < lines.length &&
+            lines[i].trim() &&
+            !lines[i].trim().startsWith("```") &&
+            !/^(#{1,4})\s+/.test(lines[i]) &&
+            !lines[i].trim().startsWith(">") &&
+            !/^\s*[-*+]\s+/.test(lines[i]) &&
+            !/^\s*\d+\.\s+/.test(lines[i])
+          ) {
+            pLines.push(lines[i].trim());
+            i += 1;
+          }
+          const p = el("p");
+          renderSafeInline(p, pLines.join(" "));
+          root.appendChild(p);
+        }
+
+        return root;
+      }
+
+      // View Switching
+      function setViewMode(mode, { fromUser = false, autoFit = false } = {}) {
+        if (fromUser) state.userPickedView = true;
+        state.viewMode = mode === "work" ? "work" : "pipeline";
+
+        const isWork = state.viewMode === "work";
+        els.btnViewWork.classList.toggle("active", isWork);
+        els.btnViewWork.setAttribute("aria-selected", String(isWork));
+        els.btnViewPipeline.classList.toggle("active", !isWork);
+        els.btnViewPipeline.setAttribute("aria-selected", String(!isWork));
+
+        els.pipelineMetrics.classList.toggle("hidden", isWork);
+        els.workMetrics.classList.toggle("hidden", !isWork);
+        els.btnMockery.classList.toggle("hidden", isWork);
+        els.btnBlast.classList.toggle("hidden", isWork);
+        els.btnCp.classList.toggle("hidden", !isWork);
+        els.workSubbar.classList.toggle("hidden", !isWork);
+        els.pipelineTabBar.classList.toggle("hidden", isWork);
+
+        updateWorkRefreshVisibility();
+        renderLegend();
+        renderActiveView({ preserveScroll: false });
+
+        if (autoFit) {
+          requestAnimationFrame(() => fitZoom());
+        }
+      }
+
+      function updateWorkRefreshVisibility() {
+        const liveSupported = Boolean(
+          state.viewMode === "work" &&
+            state.workEnvelope?.graph?.source?.live_refresh_supported
+        );
+        els.btnWorkRefresh.classList.toggle("hidden", !liveSupported);
+      }
+
+      function renderLegend() {
+        els.legendItems.textContent = "";
+        if (state.viewMode === "work") {
+          const addLine = (cls, label) => {
+            const item = el("span", "legend-item");
+            item.appendChild(el("span", `legend-line ${cls}`));
+            item.appendChild(document.createTextNode(label));
+            els.legendItems.appendChild(item);
+          };
+          addLine("", "Blocks dependency");
+          addLine("cp", "Critical Path");
+          [
+            ["badge-pass", "DONE"],
+            ["badge-review", "IN REVIEW"],
+            ["badge-unreviewed", "IN PROGRESS"],
+            ["badge-unlocked", "READY"],
+            ["badge-stale", "BLOCKED"],
+          ].forEach(([cls, txt]) => {
+            const item = el("span", "legend-item");
+            item.appendChild(el("span", `badge ${cls}`, txt));
+            els.legendItems.appendChild(item);
+          });
+          return;
+        }
+
+        const req = el("span", "legend-item");
+        req.appendChild(el("span", "legend-line"));
+        req.appendChild(document.createTextNode("Required edge"));
+        els.legendItems.appendChild(req);
+
+        const opt = el("span", "legend-item");
+        opt.appendChild(el("span", "legend-line dashed"));
+        opt.appendChild(document.createTextNode("Recommended / Optional"));
+        els.legendItems.appendChild(opt);
+
+        [
+          ["badge-pass", "PASS"],
+          ["badge-fail", "FAIL"],
+          ["badge-stale", "STALE"],
+          ["badge-unreviewed", "UNREVIEWED"],
+          ["badge-unlocked", "UNLOCKED"],
+          ["badge-locked", "LOCKED"],
+        ].forEach(([cls, txt]) => {
+          const item = el("span", "legend-item");
+          item.appendChild(el("span", `badge ${cls}`, txt));
+          els.legendItems.appendChild(item);
+        });
+      }
+
+      function renderActiveView({ preserveScroll = true } = {}) {
+        if (state.viewMode === "work") {
+          renderWorkSummary();
+          renderWorkDag();
+          renderWorkInspector({ preserveScroll });
+        } else {
+          els.workEmptyHost.textContent = "";
+          els.dagStage.classList.remove("hidden");
+          renderPipelineSummary();
+          renderPipelineDag();
+          renderPipelineInspector({ preserveScroll });
+        }
+      }
+
+      // =========================================================================
+      // WORK TECH-TREE VIEW
+      // =========================================================================
+      function workBadgeForStatus(techStatus) {
+        switch (techStatus) {
+          case "done": return { text: "DONE", cls: "badge-pass" };
+          case "in_review": return { text: "IN REVIEW", cls: "badge-review" };
+          case "in_progress": return { text: "IN PROGRESS", cls: "badge-unreviewed" };
+          case "ready": return { text: "READY", cls: "badge-unlocked" };
+          case "blocked": return { text: "BLOCKED", cls: "badge-stale" };
+          case "canceled": return { text: "CANCELED", cls: "badge-locked" };
+          default: return { text: String(techStatus || "OPEN").toUpperCase(), cls: "badge-neutral" };
+        }
+      }
+
+      function workPromptLabel(item) {
+        switch (item.tech_status) {
+          case "ready": return "Start Ready Ticket";
+          case "blocked": return "Unblock Prerequisites";
+          case "in_review": return "Verify & Merge PR";
+          case "in_progress": return "Continue Implementation";
+          case "done": return "Downstream Next Work";
+          default: return "Ticket Action Prompt";
+        }
+      }
+
+      function populateScopeDropdown(wg) {
+        const prev = state.workScope;
+        els.scopeSelect.textContent = "";
+        const optAll = el("option", "", "All Active Projects");
+        optAll.value = "all";
+        els.scopeSelect.appendChild(optAll);
+
+        const projects = wg.projects || [];
+        const milestones = wg.milestones || [];
+        const msByProj = new Map();
+        for (const m of milestones) {
+          const pid = m.project_id || "__none__";
+          if (!msByProj.has(pid)) msByProj.set(pid, []);
+          msByProj.get(pid).push(m);
+        }
+
+        const validValues = new Set(["all"]);
+        for (const p of projects) {
+          const pOpt = el("option", "", `Project: ${p.name}`);
+          pOpt.value = `project:${p.id}`;
+          validValues.add(pOpt.value);
+          els.scopeSelect.appendChild(pOpt);
+
+          const pMs = msByProj.get(p.id) || [];
+          for (const m of pMs) {
+            const mOpt = el("option", "", `  ↳ ${p.name} — ${m.name}`);
+            mOpt.value = `milestone:${m.id}`;
+            validValues.add(mOpt.value);
+            els.scopeSelect.appendChild(mOpt);
+          }
+        }
+
+        state.workScope = validValues.has(prev) ? prev : "all";
+        els.scopeSelect.value = state.workScope;
+      }
+
+      function getFilteredWorkItems() {
+        const wg = state.workEnvelope?.graph;
+        if (!wg) return [];
+        return (wg.items || []).filter((item) => {
+          if (state.workScope.startsWith("project:")) {
+            const pid = state.workScope.slice("project:".length);
+            if (item.project_id !== pid) return false;
+          } else if (state.workScope.startsWith("milestone:")) {
+            const mid = state.workScope.slice("milestone:".length);
+            if (item.milestone_id !== mid) return false;
+          }
+
+          if (state.hideDone && (item.tech_status === "done" || item.tech_status === "canceled")) {
+            return false;
+          }
+
+          if (state.workFilter === "ready" && item.tech_status !== "ready") return false;
+          if (
+            state.workFilter === "active" &&
+            item.tech_status !== "in_progress" &&
+            item.tech_status !== "in_review"
+          ) {
+            return false;
+          }
+          if (state.workFilter === "blocked" && item.tech_status !== "blocked") return false;
+          return true;
+        });
+      }
+
+      function computeWorkAncestorsAndDescendants(focusId, edges) {
+        const up = new Set();
+        const down = new Set();
+        if (!focusId) return { up, down };
+
+        const qUp = [focusId];
+        while (qUp.length) {
+          const cur = qUp.shift();
+          for (const e of edges) {
+            if (e.to === cur && !up.has(e.from) && e.from !== focusId) {
+              up.add(e.from);
+              qUp.push(e.from);
+            }
+          }
+        }
+
+        const qDown = [focusId];
+        while (qDown.length) {
+          const cur = qDown.shift();
+          for (const e of edges) {
+            if (e.from === cur && !down.has(e.to) && e.to !== focusId) {
+              down.add(e.to);
+              qDown.push(e.to);
+            }
+          }
+        }
+        return { up, down };
+      }
+
+      function renderWorkSummary() {
+        const env = state.workEnvelope;
+        const wg = env?.graph;
+        if (!wg) {
+          els.projectName.textContent = "Work Tech-Tree";
+          els.workspaceRoot.textContent = env?.error ? "work-graph error" : "no work-graph configured";
+          els.wmetricDoneText.textContent = "0/0 Done";
+          els.wmetricDoneFill.style.width = "0%";
+          els.wmetricReady.textContent = "Ready: 0";
+          els.wmetricActive.textContent = "Active: 0";
+          els.wmetricBlocked.textContent = "Blocked: 0";
+          els.wmetricCp.textContent = "Critical Path: 0 pts";
+          els.workScopePoints.textContent = "";
+          return;
+        }
+
+        const src = wg.source || {};
+        els.projectName.textContent = src.team
+          ? `${src.workspace || "Linear"} (${src.team})`
+          : src.workspace || "Work Tech-Tree";
+        els.workspaceRoot.textContent = `source: ${src.kind || "local_file"}`;
+        els.workspaceRoot.title = src.refreshed_at ? `Refreshed: ${src.refreshed_at}` : "";
+
+        // Compute metrics for current scope (project/milestone) so dropdown reflects real progress
+        const scopedAll = (wg.items || []).filter((item) => {
+          if (state.workScope.startsWith("project:")) {
+            return item.project_id === state.workScope.slice("project:".length);
+          }
+          if (state.workScope.startsWith("milestone:")) {
+            return item.milestone_id === state.workScope.slice("milestone:".length);
+          }
+          return true;
+        });
+
+        let done = 0;
+        let ready = 0;
+        let active = 0;
+        let blocked = 0;
+        let totalPts = 0;
+        let donePts = 0;
+        for (const it of scopedAll) {
+          if (it.tech_status === "done") done += 1;
+          else if (it.tech_status === "ready") ready += 1;
+          else if (it.tech_status === "in_progress" || it.tech_status === "in_review") active += 1;
+          else if (it.tech_status === "blocked") blocked += 1;
+          if (it.tech_status !== "canceled" && typeof it.estimate === "number") {
+            totalPts += it.estimate;
+            if (it.tech_status === "done") donePts += it.estimate;
+          }
+        }
+        const nonCanceled = scopedAll.filter((it) => it.tech_status !== "canceled").length;
+        const pct = nonCanceled > 0 ? Math.round((done / nonCanceled) * 100) : 0;
+
+        els.wmetricDoneText.textContent = `${done}/${nonCanceled} Done`;
+        els.wmetricDoneFill.style.width = `${pct}%`;
+
+        els.wmetricReady.textContent = `Ready: ${ready}`;
+        els.wmetricReady.classList.toggle("has-unlocked", ready > 0);
+
+        els.wmetricActive.textContent = `Active: ${active}`;
+        els.wmetricActive.classList.toggle("has-active", active > 0);
+
+        els.wmetricBlocked.textContent = `Blocked: ${blocked}`;
+        els.wmetricBlocked.classList.toggle("has-stale", blocked > 0);
+
+        const cpPts = wg.summary?.critical_path_points ?? 0;
+        els.wmetricCp.textContent = `Critical Path: ${cpPts} pts`;
+        els.wmetricCp.classList.toggle("has-stale", cpPts > 0);
+
+        els.workScopePoints.textContent = `Points: ${donePts}/${totalPts} completed (${Math.max(0, totalPts - donePts)} rem)`;
+      }
+
+      function renderWorkDag() {
+        const env = state.workEnvelope;
+        const wg = env?.graph;
+        els.workEmptyHost.textContent = "";
+
+        if (!wg) {
+          els.dagStage.classList.add("hidden");
+          const box = el("div", "work-empty-canvas");
+          box.appendChild(el("h3", "", env?.error ? "Failed to Load Work-Graph" : "No Work-Graph Configured"));
+          box.appendChild(
+            el(
+              "p",
+              "",
+              env?.error
+                ? env.error
+                : "Start sf-tree with --work-graph <snapshot.json> (via Linear MCP) or --linear-team / --linear-project (with LINEAR_API_KEY) to visualize ticket dependencies and Critical Path."
+            )
+          );
+          const switchBtn = el("button", "btn btn-primary", "Switch to Pipeline Stages");
+          switchBtn.type = "button";
+          switchBtn.addEventListener("click", () => setViewMode("pipeline", { fromUser: true, autoFit: true }));
+          box.appendChild(switchBtn);
+          els.workEmptyHost.appendChild(box);
+          return;
+        }
+
+        const visibleItems = getFilteredWorkItems();
+        if (visibleItems.length === 0) {
+          els.dagStage.classList.add("hidden");
+          const box = el("div", "work-empty-canvas");
+          box.appendChild(el("h3", "", "No matching tickets"));
+          box.appendChild(el("p", "", "Adjust the Project/Milestone scope or Quick Filter pills above to see work items."));
+          const resetBtn = el("button", "btn", "Reset Filters");
+          resetBtn.type = "button";
+          resetBtn.addEventListener("click", () => {
+            state.workScope = "all";
+            state.workFilter = "all";
+            state.hideDone = false;
+            els.scopeSelect.value = "all";
+            syncWorkFilterButtons();
+            renderActiveView({ preserveScroll: false });
+            requestAnimationFrame(() => fitZoom());
+          });
+          box.appendChild(resetBtn);
+          els.workEmptyHost.appendChild(box);
+          return;
+        }
+
+        els.dagStage.classList.remove("hidden");
+        const visibleIds = new Set(visibleItems.map((it) => it.id));
+        const visibleEdges = (wg.edges || []).filter(
+          (e) => visibleIds.has(e.from) && visibleIds.has(e.to)
+        );
+
+        const projectById = new Map((wg.projects || []).map((p) => [p.id, p]));
+        const milestoneById = new Map((wg.milestones || []).map((m) => [m.id, m]));
+
+        // Group visible items by tier and compress empty tier gaps for crisp rendering
+        const tierGroups = new Map();
+        for (const item of visibleItems) {
+          const t = typeof item.tier === "number" ? item.tier : 0;
+          if (!tierGroups.has(t)) tierGroups.set(t, []);
+          tierGroups.get(t).push(item);
+        }
+        const sortedTiers = [...tierGroups.keys()].sort((a, b) => a - b);
+
+        state.workRects = new Map();
+        let maxRows = 1;
+        sortedTiers.forEach((tierNum, colIdx) => {
+          const group = tierGroups.get(tierNum);
+          if (group.length > maxRows) maxRows = group.length;
+          group.forEach((item, rowIdx) => {
+            const x = W_PAD_X + colIdx * (W_NODE_W + W_COL_GAP);
+            const y = W_PAD_Y + rowIdx * (W_NODE_H + W_ROW_GAP);
+            state.workRects.set(item.id, { x, y, w: W_NODE_W, h: W_NODE_H, col: colIdx, row: rowIdx, tier: tierNum });
+          });
+        });
+
+        const stageW = W_PAD_X * 2 + sortedTiers.length * W_NODE_W + Math.max(0, sortedTiers.length - 1) * W_COL_GAP;
+        const stageH = W_PAD_Y + maxRows * W_NODE_H + Math.max(0, maxRows - 1) * W_ROW_GAP + 48;
+
+        els.dagStage.style.width = `${stageW}px`;
+        els.dagStage.style.height = `${stageH}px`;
+        els.dagStage.style.transform = `scale(${state.zoom})`;
+
+        els.dagEdges.setAttribute("width", String(stageW));
+        els.dagEdges.setAttribute("height", String(stageH));
+        els.dagEdges.setAttribute("viewBox", `0 0 ${stageW} ${stageH}`);
+        els.dagEdges.textContent = "";
+
+        const focusId = state.hoveredWorkId || state.selectedWorkId;
+        const { up, down } = computeWorkAncestorsAndDescendants(focusId, visibleEdges);
+
+        const cpIds = wg.summary?.critical_path_ids || [];
+        const cpNodeSet = new Set(cpIds);
+        const cpEdgeSet = new Set();
+        for (let i = 0; i < cpIds.length - 1; i += 1) {
+          cpEdgeSet.add(`${cpIds[i]}\u0000${cpIds[i + 1]}`);
+        }
+
+        // SVG arrowhead markers
+        const svgNS = "http://www.w3.org/2000/svg";
+        const defs = document.createElementNS(svgNS, "defs");
+        [
+          { id: "warr-default", color: "var(--edge-required)" },
+          { id: "warr-up", color: "var(--edge-upstream)" },
+          { id: "warr-down", color: "var(--edge-downstream)" },
+          { id: "warr-cp", color: "var(--edge-blast)" },
+        ].forEach((m) => {
+          const marker = document.createElementNS(svgNS, "marker");
+          marker.setAttribute("id", m.id);
+          marker.setAttribute("markerWidth", "8");
+          marker.setAttribute("markerHeight", "8");
+          marker.setAttribute("refX", "7");
+          marker.setAttribute("refY", "4");
+          marker.setAttribute("orient", "auto");
+          const poly = document.createElementNS(svgNS, "polygon");
+          poly.setAttribute("points", "0 1, 8 4, 0 7");
+          poly.setAttribute("fill", m.color);
+          marker.appendChild(poly);
+          defs.appendChild(marker);
+        });
+        els.dagEdges.appendChild(defs);
+
+        // Render SVG cubic Bezier edges
+        for (const edge of visibleEdges) {
+          const a = state.workRects.get(edge.from);
+          const b = state.workRects.get(edge.to);
+          if (!a || !b) continue;
+
+          const x1 = a.x + a.w;
+          const y1 = a.y + a.h / 2;
+          const x2 = b.x - 2;
+          const y2 = b.y + b.h / 2;
+          const dx = Math.max(36, Math.abs(x2 - x1) * 0.45);
+          const d = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+
+          const pathEl = document.createElementNS(svgNS, "path");
+          pathEl.setAttribute("d", d);
+          const classes = ["dag-edge"];
+          let markerId = "warr-default";
+
+          if (state.highlightCriticalPath) {
+            if (cpEdgeSet.has(`${edge.from}\u0000${edge.to}`)) {
+              classes.push("edge-blast");
+              markerId = "warr-cp";
+            } else {
+              classes.push("dimmed");
+            }
+          } else if (focusId && visibleIds.has(focusId)) {
+            const isUpEdge =
+              (edge.to === focusId || up.has(edge.to)) &&
+              (up.has(edge.from) || edge.from === focusId) &&
+              edge.from !== focusId;
+            const isDownEdge =
+              (edge.from === focusId || down.has(edge.from)) &&
+              (down.has(edge.to) || edge.to === focusId) &&
+              edge.to !== focusId;
+            if (isUpEdge) {
+              classes.push("edge-upstream");
+              markerId = "warr-up";
+            } else if (isDownEdge) {
+              classes.push("edge-downstream");
+              markerId = "warr-down";
+            } else {
+              classes.push("dimmed");
+            }
+          }
+
+          pathEl.setAttribute("class", classes.join(" "));
+          pathEl.setAttribute("marker-end", `url(#${markerId})`);
+          els.dagEdges.appendChild(pathEl);
+        }
+
+        // Render tier headers + ticket cards
+        els.dagNodes.textContent = "";
+        sortedTiers.forEach((tierNum, colIdx) => {
+          const x = W_PAD_X + colIdx * (W_NODE_W + W_COL_GAP);
+          const hdr = el("div", "tier-header", `Tier ${tierNum}`);
+          hdr.style.left = `${x}px`;
+          els.dagNodes.appendChild(hdr);
+        });
+
+        for (const item of visibleItems) {
+          const r = state.workRects.get(item.id);
+          const card = el("div", `dag-node work-node wstatus-${item.tech_status}`);
+          card.style.left = `${r.x}px`;
+          card.style.top = `${r.y}px`;
+          card.setAttribute("tabindex", "0");
+          card.setAttribute("role", "button");
+          card.setAttribute("data-work-id", item.id);
+          card.setAttribute("aria-label", `${item.id}: ${item.title} (${item.tech_status})`);
+
+          const proj = item.project_id ? projectById.get(item.project_id) : null;
+          if (proj && proj.color && /^#[0-9a-fA-F]{3,8}$/.test(proj.color)) {
+            card.style.borderLeftColor = proj.color;
+          }
+
+          if (item.id === state.selectedWorkId) card.classList.add("selected");
+
+          if (state.highlightCriticalPath) {
+            if (cpNodeSet.has(item.id)) {
+              card.classList.add("node-blast");
+            } else {
+              card.classList.add("dimmed");
+            }
+          } else if (focusId && visibleIds.has(focusId) && focusId !== item.id) {
+            if (up.has(item.id)) card.classList.add("node-upstream");
+            else if (down.has(item.id)) card.classList.add("node-downstream");
+            else card.classList.add("dimmed");
+          }
+
+          const head = el("div", "node-head");
+          head.appendChild(el("span", "node-stage-tag", item.id));
+          const rightMeta = el("div", "node-badges");
+          if (item.estimate !== null && item.estimate !== undefined) {
+            rightMeta.appendChild(el("span", "badge badge-neutral", `${item.estimate} pts`));
+          }
+          if (item.prs && item.prs.length > 0) {
+            rightMeta.appendChild(el("span", "badge badge-unreviewed", `PR${item.prs.length > 1 ? ` ×${item.prs.length}` : ""}`));
+          }
+          if (item.on_critical_path) {
+            rightMeta.appendChild(el("span", "badge badge-stale", "CP"));
+          }
+          head.appendChild(rightMeta);
+          card.appendChild(head);
+
+          card.appendChild(el("div", "work-title", item.title));
+
+          const ms = item.milestone_id ? milestoneById.get(item.milestone_id) : null;
+          const scopeTag = ms ? ms.name : proj ? proj.name : "";
+          if (scopeTag) {
+            card.appendChild(el("div", "node-file", scopeTag));
+          }
+
+          const badges = el("div", "node-badges");
+          const wb = workBadgeForStatus(item.tech_status);
+          badges.appendChild(el("span", `badge ${wb.cls}`, wb.text));
+          card.appendChild(badges);
+
+          card.addEventListener("mouseenter", () => {
+            if (state.hoveredWorkId !== item.id) {
+              state.hoveredWorkId = item.id;
+              renderWorkDag();
+            }
+          });
+          card.addEventListener("mouseleave", () => {
+            if (state.hoveredWorkId !== null) {
+              state.hoveredWorkId = null;
+              renderWorkDag();
+            }
+          });
+          card.addEventListener("click", () => selectWorkItem(item.id));
+          card.addEventListener("keydown", (ev) => {
+            if (ev.key === "Enter" || ev.key === " ") {
+              ev.preventDefault();
+              selectWorkItem(item.id);
+            }
+          });
+
+          els.dagNodes.appendChild(card);
+        }
+      }
+
+      function selectWorkItem(itemId, { scrollIntoView = false } = {}) {
+        const changed = state.selectedWorkId !== itemId;
+        state.selectedWorkId = itemId;
+
+        // If target item is currently filtered out, relax filters so jump navigation always succeeds
+        const visible = getFilteredWorkItems();
+        if (!visible.some((it) => it.id === itemId)) {
+          state.workScope = "all";
+          state.workFilter = "all";
+          state.hideDone = false;
+          els.scopeSelect.value = "all";
+          syncWorkFilterButtons();
+          renderWorkSummary();
+        }
+
+        renderWorkDag();
+        renderWorkInspector({ preserveScroll: !changed });
+
+        if (scrollIntoView) {
+          const r = state.workRects.get(itemId);
+          if (r) {
+            els.canvasScroller.scrollTo({
+              left: Math.max(0, r.x * state.zoom - 120),
+              top: Math.max(0, r.y * state.zoom - 100),
+              behavior: "smooth",
+            });
+          }
+        }
+      }
+
+      function renderWorkInspector({ preserveScroll = true } = {}) {
+        const wg = state.workEnvelope?.graph;
+        const prevScroll = preserveScroll ? els.inspectorBody.scrollTop : 0;
+
+        els.inspectorHeader.textContent = "";
+        els.inspectorBody.textContent = "";
+
+        if (!wg) {
+          els.inspectorHeader.appendChild(el("h2", "inspector-title", "Work Ticket Inspector"));
+          els.inspectorBody.appendChild(
+            el("div", "empty-note", "Load a work-graph snapshot or configure Linear GraphQL to inspect tickets.")
+          );
+          return;
+        }
+
+        const itemById = new Map((wg.items || []).map((it) => [it.id, it]));
+        const projectById = new Map((wg.projects || []).map((p) => [p.id, p]));
+        const milestoneById = new Map((wg.milestones || []).map((m) => [m.id, m]));
+        const item = state.selectedWorkId ? itemById.get(state.selectedWorkId) : null;
+
+        if (!item) {
+          els.inspectorHeader.appendChild(el("h2", "inspector-title", "Select a work item"));
+          els.inspectorBody.appendChild(
+            el("div", "empty-note", "Click any ticket node on the Work Tech-Tree canvas to inspect blockers, unlocks, PRs, description, and tailored prompt.")
+          );
+          return;
+        }
+
+        // Header row
+        const titleRow = el("div", "inspector-title-row");
+        const titleWrap = el("div");
+        titleWrap.appendChild(el("div", "inspector-sub", `${item.id} · Tier ${item.tier}`));
+        titleWrap.appendChild(el("h2", "inspector-title", item.title));
+        titleRow.appendChild(titleWrap);
+
+        const badgeWrap = el("div", "node-badges");
+        const wb = workBadgeForStatus(item.tech_status);
+        badgeWrap.appendChild(el("span", `badge ${wb.cls}`, wb.text));
+        if (item.on_critical_path) {
+          badgeWrap.appendChild(el("span", "badge badge-stale", "CRITICAL PATH"));
+        }
+        titleRow.appendChild(badgeWrap);
+        els.inspectorHeader.appendChild(titleRow);
+
+        // Deep link row (strictly https://)
+        const actionsRow = el("div", "inspector-actions-row");
+        const safeLinearUrl = sanitizeExternalHttpsUrl(item.url);
+        if (safeLinearUrl) {
+          const link = el("a", "btn", "Open in Linear ↗");
+          link.href = safeLinearUrl;
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          actionsRow.appendChild(link);
+        }
+        if (item.git_branch) {
+          const copyBranchBtn = el("button", "btn", "Copy Branch");
+          copyBranchBtn.type = "button";
+          copyBranchBtn.addEventListener("click", () =>
+            copyText(item.git_branch, `Copied branch: ${item.git_branch}`)
+          );
+          actionsRow.appendChild(copyBranchBtn);
+        }
+        if (actionsRow.childNodes.length > 0) {
+          els.inspectorHeader.appendChild(actionsRow);
+        }
+
+        // State-aware Copy Prompt bar
+        const promptBox = el("div", "prompt-box");
+        const pHead = el("div", "prompt-box-head");
+        pHead.appendChild(el("span", "prompt-box-label", workPromptLabel(item)));
+        const copyBtn = el("button", "btn btn-primary", "Copy Prompt");
+        copyBtn.type = "button";
+        copyBtn.addEventListener("click", () =>
+          copyText(item.next_prompt || "", "Copied ticket prompt to clipboard")
+        );
+        pHead.appendChild(copyBtn);
+        promptBox.appendChild(pHead);
+        promptBox.appendChild(el("p", "prompt-text", item.next_prompt || ""));
+        els.inspectorHeader.appendChild(promptBox);
+
+        // Cycle warnings banner if present
+        if (wg.summary?.cycle_warnings?.length > 0) {
+          const warnBox = el("div", "alert-card alert-warn");
+          warnBox.appendChild(el("h4", "", "Dependency Cycle Warnings"));
+          const ul = el("ul");
+          wg.summary.cycle_warnings.forEach((w) => ul.appendChild(el("li", "", w)));
+          warnBox.appendChild(ul);
+          els.inspectorBody.appendChild(warnBox);
+        }
+
+        // Metadata Grid
+        const proj = item.project_id ? projectById.get(item.project_id) : null;
+        const ms = item.milestone_id ? milestoneById.get(item.milestone_id) : null;
+        const metaGrid = el("div", "meta-grid");
+        [
+          ["Project", proj ? proj.name : "—"],
+          ["Milestone", ms ? ms.name : "—"],
+          ["Tracker Status", `${item.status_name} (${item.status_type})`],
+          ["Estimate", item.estimate !== null && item.estimate !== undefined ? `${item.estimate} pts` : "Unestimated"],
+          ["Priority", PRIORITY_NAMES[item.priority] || "None"],
+          ["Assignee", item.assignee || "Unassigned"],
+        ].forEach(([k, v]) => {
+          const c = el("div", "kv-card");
+          c.appendChild(el("div", "kv-key", k));
+          c.appendChild(el("div", "kv-value", v));
+          metaGrid.appendChild(c);
+        });
+        els.inspectorBody.appendChild(metaGrid);
+
+        if (item.git_branch) {
+          const branchCard = el("div", "kv-card");
+          branchCard.appendChild(el("div", "kv-key", "Git Branch"));
+          branchCard.appendChild(el("div", "kv-value inspector-sub", item.git_branch));
+          els.inspectorBody.appendChild(branchCard);
+        }
+
+        if (item.labels && item.labels.length > 0) {
+          const lblCard = el("div", "kv-card");
+          lblCard.appendChild(el("div", "kv-key", "Labels"));
+          const wrap = el("div", "node-badges");
+          item.labels.forEach((lbl) => wrap.appendChild(el("span", "badge badge-neutral", lbl)));
+          lblCard.appendChild(wrap);
+          els.inspectorBody.appendChild(lblCard);
+        }
+
+        // Blockers (Upstream)
+        const blockersCard = el("div", "kv-card");
+        blockersCard.appendChild(el("div", "kv-key", `Blockers / Prerequisites (${item.blocked_by.length})`));
+        if (item.blocked_by.length === 0) {
+          blockersCard.appendChild(el("div", "kv-value", "None — no upstream blockers."));
+        } else {
+          const list = el("div", "jump-list");
+          for (const bid of item.blocked_by) {
+            const bItem = itemById.get(bid);
+            const btn = el("button", "jump-btn");
+            btn.type = "button";
+            btn.appendChild(el("strong", "inspector-sub", bid));
+            btn.appendChild(el("span", "jump-btn-title", bItem ? bItem.title : bid));
+            if (bItem) {
+              const bb = workBadgeForStatus(bItem.tech_status);
+              btn.appendChild(el("span", `badge ${bb.cls}`, bb.text));
+            }
+            btn.addEventListener("click", () => selectWorkItem(bid, { scrollIntoView: true }));
+            list.appendChild(btn);
+          }
+          blockersCard.appendChild(list);
+        }
+        els.inspectorBody.appendChild(blockersCard);
+
+        // Unlocks (Downstream)
+        const unlocksCard = el("div", "kv-card");
+        unlocksCard.appendChild(el("div", "kv-key", `Unlocks / Downstream (${item.blocks.length})`));
+        if (item.blocks.length === 0) {
+          unlocksCard.appendChild(el("div", "kv-value", "None — terminal item."));
+        } else {
+          const list = el("div", "jump-list");
+          for (const uid of item.blocks) {
+            const uItem = itemById.get(uid);
+            const btn = el("button", "jump-btn");
+            btn.type = "button";
+            btn.appendChild(el("strong", "inspector-sub", uid));
+            btn.appendChild(el("span", "jump-btn-title", uItem ? uItem.title : uid));
+            if (uItem) {
+              const ub = workBadgeForStatus(uItem.tech_status);
+              btn.appendChild(el("span", `badge ${ub.cls}`, ub.text));
+            }
+            btn.addEventListener("click", () => selectWorkItem(uid, { scrollIntoView: true }));
+            list.appendChild(btn);
+          }
+          unlocksCard.appendChild(list);
+        }
+        els.inspectorBody.appendChild(unlocksCard);
+
+        // Linked PRs
+        if (item.prs && item.prs.length > 0) {
+          const prCard = el("div", "kv-card");
+          prCard.appendChild(el("div", "kv-key", `Linked PRs (${item.prs.length})`));
+          const list = el("div", "jump-list");
+          for (const pr of item.prs) {
+            const safePrUrl = sanitizeExternalHttpsUrl(pr.url);
+            if (!safePrUrl) continue;
+            const a = el("a", "btn", `${pr.title} ↗`);
+            a.href = safePrUrl;
+            a.target = "_blank";
+            a.rel = "noopener noreferrer";
+            list.appendChild(a);
+          }
+          prCard.appendChild(list);
+          els.inspectorBody.appendChild(prCard);
+        }
+
+        // XSS-Safe Description Markdown
+        const descCard = el("div", "kv-card");
+        descCard.appendChild(el("div", "kv-key", "Description"));
+        if (item.description && item.description.trim()) {
+          descCard.appendChild(renderSafeMarkdown(item.description));
+        } else {
+          descCard.appendChild(el("div", "kv-value", "(No description)"));
+        }
+        els.inspectorBody.appendChild(descCard);
+
+        els.inspectorBody.scrollTop = preserveScroll ? prevScroll : 0;
+      }
+
+      function applyWorkEnvelope(envelope) {
+        const wasNull = !state.workEnvelope;
+        state.workEnvelope = envelope;
+        const wg = envelope?.graph || null;
+
+        if (wg) {
+          populateScopeDropdown(wg);
+          const itemIds = new Set((wg.items || []).map((it) => it.id));
+          if (!state.selectedWorkId || !itemIds.has(state.selectedWorkId)) {
+            const pick =
+              wg.items.find((it) => it.tech_status === "ready" && it.on_critical_path) ||
+              wg.items.find((it) => it.tech_status === "ready") ||
+              wg.items.find((it) => it.tech_status === "in_progress" || it.tech_status === "in_review") ||
+              wg.items[0];
+            state.selectedWorkId = pick ? pick.id : null;
+          }
+        }
+
+        if (wasNull && !state.userPickedView && envelope?.default_view === "work") {
+          setViewMode("work", { fromUser: false, autoFit: true });
+          return;
+        }
+
+        updateWorkRefreshVisibility();
+        if (state.viewMode === "work") {
+          renderWorkSummary();
+          renderWorkDag();
+          renderWorkInspector({ preserveScroll: !wasNull });
+          if (wasNull) {
+            requestAnimationFrame(() => fitZoom());
+          }
+        }
+      }
+
+      // =========================================================================
+      // PIPELINE STAGES VIEW (v1 preserved 100%)
+      // =========================================================================
+      function badgeForPipelineStatus(status) {
         switch (status) {
           case "reviewed_pass": return { text: "PASS", cls: "badge-pass" };
           case "reviewed_fail": return { text: "FAIL", cls: "badge-fail" };
@@ -1333,64 +2602,32 @@
         return "Next Step Prompt";
       }
 
-      function getVisibleNodes() {
+      function getVisiblePipelineNodes() {
         if (!state.graph) return [];
         return state.graph.nodes.filter((n) => state.showMockery || !n.optional);
       }
 
-      function getVisibleEdges() {
+      function getVisiblePipelineEdges() {
         if (!state.graph) return [];
-        const visiblePhases = new Set(getVisibleNodes().map((n) => n.phase));
+        const visiblePhases = new Set(getVisiblePipelineNodes().map((n) => n.phase));
         return state.graph.edges.filter(
           (e) => visiblePhases.has(e.from) && visiblePhases.has(e.to)
         );
       }
 
-      function nodeRect(phase) {
-        const pos = LAYOUT[phase] || { col: 0, row: 0 };
-        const x = PAD_X + pos.col * (NODE_W + COL_GAP);
-        const y = PAD_Y + pos.row * (NODE_H + ROW_GAP);
-        return { x, y, w: NODE_W, h: NODE_H, col: pos.col, row: pos.row };
+      function pipelineNodeRect(phase) {
+        const pos = PIPELINE_LAYOUT[phase] || { col: 0, row: 0 };
+        const x = P_PAD_X + pos.col * (P_NODE_W + P_COL_GAP);
+        const y = P_PAD_Y + pos.row * (P_NODE_H + P_ROW_GAP);
+        return { x, y, w: P_NODE_W, h: P_NODE_H, col: pos.col, row: pos.row };
       }
 
-      function computeAncestorsAndDescendants(focusPhase, edges) {
-        const up = new Set();
-        const down = new Set();
-        if (!focusPhase) return { up, down };
-
-        const qUp = [focusPhase];
-        while (qUp.length) {
-          const cur = qUp.shift();
-          for (const e of edges) {
-            if (e.to === cur && !up.has(e.from) && e.from !== focusPhase) {
-              up.add(e.from);
-              qUp.push(e.from);
-            }
-          }
-        }
-
-        const qDown = [focusPhase];
-        while (qDown.length) {
-          const cur = qDown.shift();
-          for (const e of edges) {
-            if (e.from === cur && !down.has(e.to) && e.to !== focusPhase) {
-              down.add(e.to);
-              qDown.push(e.to);
-            }
-          }
-        }
-        return { up, down };
-      }
-
-      function computeBlastSet(nodes, edges) {
+      function computePipelineBlastSet(nodes, edges) {
         const blastNodes = new Set();
         const byPhase = new Map(nodes.map((n) => [n.phase, n]));
         for (const n of nodes) {
-          if (n.is_stale || n.status === "invalid") {
-            blastNodes.add(n.phase);
-          }
+          if (n.is_stale || n.status === "invalid") blastNodes.add(n.phase);
         }
-        // Also highlight immediate root-cause upstreams feeding a stale node.
         const blastEdges = new Set();
         for (let i = 0; i < edges.length; i += 1) {
           const e = edges[i];
@@ -1410,7 +2647,7 @@
         return { blastNodes, blastEdges };
       }
 
-      function renderSummary() {
+      function renderPipelineSummary() {
         const g = state.graph;
         if (!g) return;
         const s = g.summary;
@@ -1440,16 +2677,16 @@
         }
       }
 
-      function renderDag() {
+      function renderPipelineDag() {
         const g = state.graph;
         if (!g) return;
-        const nodes = getVisibleNodes();
-        const edges = getVisibleEdges();
+        const nodes = getVisiblePipelineNodes();
+        const edges = getVisiblePipelineEdges();
 
-        const maxCol = Math.max(...nodes.map((n) => (LAYOUT[n.phase]?.col ?? 0)));
-        const maxRow = Math.max(...nodes.map((n) => (LAYOUT[n.phase]?.row ?? 0)));
-        const stageW = PAD_X * 2 + (maxCol + 1) * NODE_W + maxCol * COL_GAP;
-        const stageH = PAD_Y + (maxRow + 1) * NODE_H + maxRow * ROW_GAP + 68;
+        const maxCol = Math.max(...nodes.map((n) => (PIPELINE_LAYOUT[n.phase]?.col ?? 0)));
+        const maxRow = Math.max(...nodes.map((n) => (PIPELINE_LAYOUT[n.phase]?.row ?? 0)));
+        const stageW = P_PAD_X * 2 + (maxCol + 1) * P_NODE_W + maxCol * P_COL_GAP;
+        const stageH = P_PAD_Y + (maxRow + 1) * P_NODE_H + maxRow * P_ROW_GAP + 68;
 
         els.dagStage.style.width = `${stageW}px`;
         els.dagStage.style.height = `${stageH}px`;
@@ -1461,21 +2698,19 @@
         els.dagEdges.textContent = "";
 
         const focusPhase = state.hoveredPhase || state.selectedPhase;
-        const { up, down } = computeAncestorsAndDescendants(focusPhase, edges);
+        const { up, down } = computeWorkAncestorsAndDescendants(focusPhase, edges);
         const { blastNodes, blastEdges } = state.highlightBlast
-          ? computeBlastSet(nodes, edges)
+          ? computePipelineBlastSet(nodes, edges)
           : { blastNodes: new Set(), blastEdges: new Set() };
 
-        // Arrowhead markers
         const svgNS = "http://www.w3.org/2000/svg";
         const defs = document.createElementNS(svgNS, "defs");
-        const markers = [
+        [
           { id: "arr-default", color: "var(--edge-required)" },
           { id: "arr-up", color: "var(--edge-upstream)" },
           { id: "arr-down", color: "var(--edge-downstream)" },
           { id: "arr-blast", color: "var(--edge-blast)" },
-        ];
-        for (const m of markers) {
+        ].forEach((m) => {
           const marker = document.createElementNS(svgNS, "marker");
           marker.setAttribute("id", m.id);
           marker.setAttribute("markerWidth", "8");
@@ -1488,13 +2723,12 @@
           poly.setAttribute("fill", m.color);
           marker.appendChild(poly);
           defs.appendChild(marker);
-        }
+        });
         els.dagEdges.appendChild(defs);
 
-        // Render edges
         edges.forEach((edge, idx) => {
-          const a = nodeRect(edge.from);
-          const b = nodeRect(edge.to);
+          const a = pipelineNodeRect(edge.from);
+          const b = pipelineNodeRect(edge.to);
           const colSpan = b.col - a.col;
           let d;
           const isSkip = colSpan > 1;
@@ -1507,11 +2741,7 @@
             const cx = (x1 + x2) / 2;
             d = `M ${x1} ${y1} C ${cx} ${y1}, ${cx} ${y2}, ${x2} ${y2}`;
           } else if (edge.to === "mockery" && edge.from === "ui") {
-            const x1 = a.x + a.w / 2;
-            const y1 = a.y + a.h;
-            const x2 = b.x + b.w / 2;
-            const y2 = b.y - 2;
-            d = `M ${x1} ${y1} L ${x2} ${y2}`;
+            d = `M ${a.x + a.w / 2} ${a.y + a.h} L ${b.x + b.w / 2} ${b.y - 2}`;
           } else if (edge.to === "mockery" || edge.from === "mockery") {
             const x1 = a.x + a.w;
             const y1 = a.y + a.h / 2 + (edge.to === "mockery" ? 18 : 0);
@@ -1520,7 +2750,6 @@
             const dx = Math.max(40, Math.abs(x2 - x1) * 0.45);
             d = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
           } else {
-            // Skip edge arched cleanly above row 0
             const lane = Math.min(5, colSpan);
             const arcLift = 20 + lane * 11;
             const x1 = a.x + a.w * 0.72;
@@ -1569,10 +2798,9 @@
           els.dagEdges.appendChild(pathEl);
         });
 
-        // Render node cards
         els.dagNodes.textContent = "";
         for (const node of nodes) {
-          const r = nodeRect(node.phase);
+          const r = pipelineNodeRect(node.phase);
           const card = el("div", "dag-node");
           card.style.left = `${r.x}px`;
           card.style.top = `${r.y}px`;
@@ -1587,19 +2815,12 @@
           if (node.phase === state.selectedPhase) card.classList.add("selected");
 
           if (state.highlightBlast) {
-            if (blastNodes.has(node.phase)) {
-              card.classList.add("node-blast");
-            } else {
-              card.classList.add("dimmed");
-            }
+            if (blastNodes.has(node.phase)) card.classList.add("node-blast");
+            else card.classList.add("dimmed");
           } else if (focusPhase && focusPhase !== node.phase) {
-            if (up.has(node.phase)) {
-              card.classList.add("node-upstream");
-            } else if (down.has(node.phase)) {
-              card.classList.add("node-downstream");
-            } else {
-              card.classList.add("dimmed");
-            }
+            if (up.has(node.phase)) card.classList.add("node-upstream");
+            else if (down.has(node.phase)) card.classList.add("node-downstream");
+            else card.classList.add("dimmed");
           }
 
           const head = el("div", "node-head");
@@ -1611,11 +2832,9 @@
           card.appendChild(el("div", "node-file", node.file.replace("docs/factory/", "")));
 
           const badges = el("div", "node-badges");
-          const stBadge = badgeForStatus(node.status);
+          const stBadge = badgeForPipelineStatus(node.status);
           badges.appendChild(el("span", `badge ${stBadge.cls}`, stBadge.text));
-          if (node.is_stale) {
-            badges.appendChild(el("span", "badge badge-stale", "STALE"));
-          }
+          if (node.is_stale) badges.appendChild(el("span", "badge badge-stale", "STALE"));
           if (node.reviews && node.reviews[0] && node.reviews[0].is_stale && !node.is_stale) {
             badges.appendChild(el("span", "badge badge-stale", "REV STALE"));
           }
@@ -1630,20 +2849,20 @@
           card.addEventListener("mouseenter", () => {
             if (state.hoveredPhase !== node.phase) {
               state.hoveredPhase = node.phase;
-              renderDag();
+              renderPipelineDag();
             }
           });
           card.addEventListener("mouseleave", () => {
             if (state.hoveredPhase !== null) {
               state.hoveredPhase = null;
-              renderDag();
+              renderPipelineDag();
             }
           });
-          card.addEventListener("click", () => selectNode(node.phase));
+          card.addEventListener("click", () => selectPipelineNode(node.phase));
           card.addEventListener("keydown", (ev) => {
             if (ev.key === "Enter" || ev.key === " ") {
               ev.preventDefault();
-              selectNode(node.phase);
+              selectPipelineNode(node.phase);
             }
           });
 
@@ -1651,33 +2870,20 @@
         }
       }
 
-      function selectNode(phase) {
+      function selectPipelineNode(phase) {
         const changed = state.selectedPhase !== phase;
         state.selectedPhase = phase;
-        renderDag();
-        renderInspector({ preserveScroll: !changed });
+        renderPipelineDag();
+        renderPipelineInspector({ preserveScroll: !changed });
       }
 
-      function getSelectedNode() {
+      function getSelectedPipelineNode() {
         if (!state.graph || !state.selectedPhase) return null;
         return state.graph.nodes.find((n) => n.phase === state.selectedPhase) || null;
       }
 
-      function sanitizePreviewUrl(urlStr) {
-        try {
-          const u = new URL(urlStr);
-          if (
-            (u.protocol === "http:" || u.protocol === "https:") &&
-            (u.hostname === "127.0.0.1" || u.hostname === "localhost")
-          ) {
-            return u.href;
-          }
-        } catch {}
-        return null;
-      }
-
-      function renderInspector({ preserveScroll = true } = {}) {
-        const node = getSelectedNode();
+      function renderPipelineInspector({ preserveScroll = true } = {}) {
+        const node = getSelectedPipelineNode();
         const prevScroll = preserveScroll ? els.inspectorBody.scrollTop : 0;
 
         els.inspectorHeader.textContent = "";
@@ -1686,34 +2892,26 @@
         if (!node) {
           els.inspectorHeader.appendChild(el("h2", "inspector-title", "Select a stage"));
           els.inspectorBody.appendChild(
-            el("div", "empty-note", "Click any node in the tech-tree DAG to inspect its <system_state>, narrative, reviews, and next prompt.")
+            el("div", "empty-note", "Click any node in the pipeline DAG to inspect its <system_state>, narrative, reviews, and next prompt.")
           );
           return;
         }
 
         els.tabBtnReviews.textContent = `Reviews (${node.reviews.length})`;
 
-        // Header title & badges
         const titleRow = el("div", "inspector-title-row");
         const titleWrap = el("div");
-        titleWrap.appendChild(
-          el("h2", "inspector-title", `${node.stage}. ${node.label}`)
-        );
-        titleWrap.appendChild(
-          el("div", "inspector-sub", `${node.skill} · ${node.file}`)
-        );
+        titleWrap.appendChild(el("h2", "inspector-title", `${node.stage}. ${node.label}`));
+        titleWrap.appendChild(el("div", "inspector-sub", `${node.skill} · ${node.file}`));
         titleRow.appendChild(titleWrap);
 
         const badgeWrap = el("div", "node-badges");
-        const stBadge = badgeForStatus(node.status);
+        const stBadge = badgeForPipelineStatus(node.status);
         badgeWrap.appendChild(el("span", `badge ${stBadge.cls}`, stBadge.text));
-        if (node.is_stale) {
-          badgeWrap.appendChild(el("span", "badge badge-stale", "STALE"));
-        }
+        if (node.is_stale) badgeWrap.appendChild(el("span", "badge badge-stale", "STALE"));
         titleRow.appendChild(badgeWrap);
         els.inspectorHeader.appendChild(titleRow);
 
-        // 1-Click Copy Prompt Bar
         const promptBox = el("div", "prompt-box");
         const pHead = el("div", "prompt-box-head");
         pHead.appendChild(el("span", "prompt-box-label", promptActionLabel(node)));
@@ -1727,20 +2925,11 @@
         promptBox.appendChild(el("p", "prompt-text", node.next_prompt || ""));
         els.inspectorHeader.appendChild(promptBox);
 
-        // Active Tab Content
-        if (state.activeTab === "overview") {
-          renderOverviewTab(node);
-        } else if (state.activeTab === "narrative") {
-          renderNarrativeTab(node);
-        } else if (state.activeTab === "reviews") {
-          renderReviewsTab(node);
-        }
+        if (state.activeTab === "overview") renderOverviewTab(node);
+        else if (state.activeTab === "narrative") renderNarrativeTab(node);
+        else if (state.activeTab === "reviews") renderReviewsTab(node);
 
-        if (preserveScroll) {
-          els.inspectorBody.scrollTop = prevScroll;
-        } else {
-          els.inspectorBody.scrollTop = 0;
-        }
+        els.inspectorBody.scrollTop = preserveScroll ? prevScroll : 0;
       }
 
       function renderMockeryExtras(mockery) {
@@ -1749,27 +2938,15 @@
         head.appendChild(el("span", "prompt-box-label", "Stage 6b Mockery Canvas"));
         const pills = el("div", "node-badges");
         pills.appendChild(
-          el(
-            "span",
-            `badge ${mockery.fidelity === "styled" ? "badge-pass" : "badge-neutral"}`,
-            mockery.fidelity || "not generated"
-          )
+          el("span", `badge ${mockery.fidelity === "styled" ? "badge-pass" : "badge-neutral"}`, mockery.fidelity || "not generated")
         );
         if (mockery.tokens_synced_from_ui !== null) {
           pills.appendChild(
-            el(
-              "span",
-              `badge ${mockery.tokens_synced_from_ui ? "badge-pass" : "badge-stale"}`,
-              mockery.tokens_synced_from_ui ? "tokens synced" : "tokens unsynced"
-            )
+            el("span", `badge ${mockery.tokens_synced_from_ui ? "badge-pass" : "badge-stale"}`, mockery.tokens_synced_from_ui ? "tokens synced" : "tokens unsynced")
           );
         }
         pills.appendChild(
-          el(
-            "span",
-            `badge ${mockery.flow_json_valid ? "badge-pass" : mockery.flow_json_exists ? "badge-fail" : "badge-locked"}`,
-            mockery.flow_json_valid ? "flow.json ok" : mockery.flow_json_exists ? "flow.json invalid" : "no flow.json"
-          )
+          el("span", `badge ${mockery.flow_json_valid ? "badge-pass" : mockery.flow_json_exists ? "badge-fail" : "badge-locked"}`, mockery.flow_json_valid ? "flow.json ok" : mockery.flow_json_exists ? "flow.json invalid" : "no flow.json")
         );
         head.appendChild(pills);
         card.appendChild(head);
@@ -1787,7 +2964,6 @@
         });
         card.appendChild(stats);
 
-        // Copy viewer & check commands
         [
           ["Copy Viewer", mockery.viewer_command],
           ["Copy Check", mockery.check_command],
@@ -1801,7 +2977,6 @@
           card.appendChild(row);
         });
 
-        // Configurable localhost preview link
         const prevRow = el("div", "cmd-row");
         const input = el("input", "preview-input");
         input.type = "url";
@@ -1831,7 +3006,6 @@
         prevRow.appendChild(input);
         prevRow.appendChild(openLink);
         card.appendChild(prevRow);
-
         return card;
       }
 
@@ -1869,38 +3043,24 @@
 
         if (!node.exists) {
           els.inspectorBody.appendChild(
-            el(
-              "div",
-              "empty-note",
-              `${node.file} does not exist yet (${node.status}). Use the Copy Prompt bar above to generate it when ready.`
-            )
+            el("div", "empty-note", `${node.file} does not exist yet (${node.status}). Use the Copy Prompt bar above to generate it when ready.`)
           );
           return;
         }
 
         if (!node.system_state) {
           els.inspectorBody.appendChild(
-            el(
-              "div",
-              "empty-note",
-              "No valid <system_state> JSON object could be parsed from this file."
-            )
+            el("div", "empty-note", "No valid <system_state> JSON object could be parsed from this file.")
           );
           return;
         }
 
-        // Metadata line
         const metaCard = el("div", "kv-card");
         metaCard.appendChild(el("div", "kv-key", "freshness_metadata"));
-        const ts = node.effective_time_ms
-          ? new Date(node.effective_time_ms).toISOString()
-          : "n/a";
-        metaCard.appendChild(
-          el("div", "kv-value", `Resolved timestamp: ${ts} (source: ${node.time_source || "n/a"})`)
-        );
+        const ts = node.effective_time_ms ? new Date(node.effective_time_ms).toISOString() : "n/a";
+        metaCard.appendChild(el("div", "kv-value", `Resolved timestamp: ${ts} (source: ${node.time_source || "n/a"})`));
         els.inspectorBody.appendChild(metaCard);
 
-        // Structured Key/Value Cards
         const kvList = el("div", "kv-list");
         for (const [key, val] of Object.entries(node.system_state)) {
           const card = el("div", "kv-card");
@@ -1914,10 +3074,7 @@
               const ul = el("ul");
               val.forEach((item) => {
                 const li = el("li");
-                li.textContent =
-                  typeof item === "object" && item !== null
-                    ? JSON.stringify(item)
-                    : String(item);
+                li.textContent = typeof item === "object" && item !== null ? JSON.stringify(item) : String(item);
                 ul.appendChild(li);
               });
               valWrap.appendChild(ul);
@@ -1933,7 +3090,6 @@
         }
         els.inspectorBody.appendChild(kvList);
 
-        // Collapsible Raw JSON
         const details = el("details", "raw-json-details");
         details.appendChild(el("summary", "", "Raw <system_state> JSON"));
         const rawStr = JSON.stringify(node.system_state, null, 2);
@@ -1946,215 +3102,11 @@
         els.inspectorBody.appendChild(details);
       }
 
-      /**
-       * XSS-safe Markdown renderer built strictly with DOM APIs (textContent only).
-       * Never uses innerHTML on untrusted markdown; blocks unsafe URL schemes.
-       */
-      function renderSafeInline(container, text) {
-        const tokenRe = /(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|\[([^\]]+)\]\(((?:[^()]+|\([^()]*\))+)\))/g;
-        let lastIdx = 0;
-        let match;
-
-        while ((match = tokenRe.exec(text)) !== null) {
-          if (match.index > lastIdx) {
-            container.appendChild(document.createTextNode(text.slice(lastIdx, match.index)));
-          }
-          const tok = match[0];
-          if (tok.startsWith("`")) {
-            container.appendChild(el("code", "", tok.slice(1, -1)));
-          } else if (tok.startsWith("**")) {
-            container.appendChild(el("strong", "", tok.slice(2, -2)));
-          } else if (tok.startsWith("*")) {
-            container.appendChild(el("em", "", tok.slice(1, -1)));
-          } else if (tok.startsWith("[")) {
-            const linkText = match[2];
-            const rawHref = match[3].trim();
-            let safeHref = null;
-            try {
-              const parsed = new URL(rawHref);
-              if (parsed.protocol === "http:" || parsed.protocol === "https:") {
-                safeHref = parsed.href;
-              }
-            } catch {}
-            if (safeHref) {
-              const a = el("a", "", linkText);
-              a.href = safeHref;
-              a.target = "_blank";
-              a.rel = "noopener noreferrer";
-              container.appendChild(a);
-            } else {
-              container.appendChild(document.createTextNode(linkText));
-            }
-          }
-          lastIdx = tokenRe.lastIndex;
-        }
-
-        if (lastIdx < text.length) {
-          container.appendChild(document.createTextNode(text.slice(lastIdx)));
-        }
-      }
-
-      function renderSafeMarkdown(markdown) {
-        const root = el("div", "md-view");
-        const lines = String(markdown || "").replace(/\r\n/g, "\n").split("\n");
-        let i = 0;
-
-        while (i < lines.length) {
-          const line = lines[i];
-
-          // Blank line
-          if (!line.trim()) {
-            i += 1;
-            continue;
-          }
-
-          // Fenced code block
-          if (line.trim().startsWith("```")) {
-            const codeLines = [];
-            i += 1;
-            while (i < lines.length && !lines[i].trim().startsWith("```")) {
-              codeLines.push(lines[i]);
-              i += 1;
-            }
-            if (i < lines.length) i += 1;
-            const pre = el("pre");
-            pre.appendChild(el("code", "", codeLines.join("\n")));
-            root.appendChild(pre);
-            continue;
-          }
-
-          // Horizontal rule
-          if (/^(\s*[-*_]\s*){3,}$/.test(line)) {
-            root.appendChild(el("hr"));
-            i += 1;
-            continue;
-          }
-
-          // Heading
-          const hMatch = line.match(/^(#{1,4})\s+(.*)$/);
-          if (hMatch) {
-            const hTag = `h${hMatch[1].length}`;
-            const hEl = el(hTag);
-            renderSafeInline(hEl, hMatch[2].trim());
-            root.appendChild(hEl);
-            i += 1;
-            continue;
-          }
-
-          // Blockquote
-          if (line.trim().startsWith(">")) {
-            const bq = el("blockquote");
-            const bqLines = [];
-            while (i < lines.length && lines[i].trim().startsWith(">")) {
-              bqLines.push(lines[i].trim().replace(/^>\s?/, ""));
-              i += 1;
-            }
-            const p = el("p");
-            renderSafeInline(p, bqLines.join(" "));
-            bq.appendChild(p);
-            root.appendChild(bq);
-            continue;
-          }
-
-          // Markdown table
-          if (
-            line.includes("|") &&
-            i + 1 < lines.length &&
-            /^\s*\|?[\s:-]+\|[\s|:-]*$/.test(lines[i + 1])
-          ) {
-            const parseRow = (r) =>
-              r
-                .trim()
-                .replace(/^\|/, "")
-                .replace(/\|$/, "")
-                .split("|")
-                .map((c) => c.trim());
-            const headers = parseRow(line);
-            i += 2;
-            const table = el("table");
-            const thead = el("thead");
-            const hTr = el("tr");
-            headers.forEach((h) => {
-              const th = el("th");
-              renderSafeInline(th, h);
-              hTr.appendChild(th);
-            });
-            thead.appendChild(hTr);
-            table.appendChild(thead);
-
-            const tbody = el("tbody");
-            while (i < lines.length && lines[i].includes("|") && lines[i].trim()) {
-              const cells = parseRow(lines[i]);
-              const tr = el("tr");
-              cells.forEach((c) => {
-                const td = el("td");
-                renderSafeInline(td, c);
-                tr.appendChild(td);
-              });
-              tbody.appendChild(tr);
-              i += 1;
-            }
-            table.appendChild(tbody);
-            root.appendChild(table);
-            continue;
-          }
-
-          // Unordered list
-          if (/^\s*[-*+]\s+/.test(line)) {
-            const ul = el("ul");
-            while (i < lines.length && /^\s*[-*+]\s+/.test(lines[i])) {
-              const li = el("li");
-              renderSafeInline(li, lines[i].replace(/^\s*[-*+]\s+/, ""));
-              ul.appendChild(li);
-              i += 1;
-            }
-            root.appendChild(ul);
-            continue;
-          }
-
-          // Ordered list
-          if (/^\s*\d+\.\s+/.test(line)) {
-            const ol = el("ol");
-            while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) {
-              const li = el("li");
-              renderSafeInline(li, lines[i].replace(/^\s*\d+\.\s+/, ""));
-              ol.appendChild(li);
-              i += 1;
-            }
-            root.appendChild(ol);
-            continue;
-          }
-
-          // Paragraph
-          const pLines = [];
-          while (
-            i < lines.length &&
-            lines[i].trim() &&
-            !lines[i].trim().startsWith("```") &&
-            !/^(#{1,4})\s+/.test(lines[i]) &&
-            !lines[i].trim().startsWith(">") &&
-            !/^\s*[-*+]\s+/.test(lines[i]) &&
-            !/^\s*\d+\.\s+/.test(lines[i])
-          ) {
-            pLines.push(lines[i].trim());
-            i += 1;
-          }
-          const p = el("p");
-          renderSafeInline(p, pLines.join(" "));
-          root.appendChild(p);
-        }
-
-        return root;
-      }
-
       async function renderNarrativeTab(node) {
         if (!node.exists) {
-          els.inspectorBody.appendChild(
-            el("div", "empty-note", `${node.file} does not exist yet.`)
-          );
+          els.inspectorBody.appendChild(el("div", "empty-note", `${node.file} does not exist yet.`));
           return;
         }
-
         const cached = state.artifactCache.get(node.phase);
         if (cached && cached.mtimeMs === node.mtime_ms) {
           if (!cached.data.narrative_markdown) {
@@ -2165,15 +3117,13 @@
           return;
         }
 
-        const loading = el("div", "empty-note", `Loading ${node.file}…`);
-        els.inspectorBody.appendChild(loading);
-
+        els.inspectorBody.appendChild(el("div", "empty-note", `Loading ${node.file}…`));
         try {
           const resp = await fetch(`/api/artifact/${encodeURIComponent(node.phase)}`);
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
           const data = await resp.json();
           state.artifactCache.set(node.phase, { mtimeMs: node.mtime_ms, data });
-          if (state.selectedPhase === node.phase && state.activeTab === "narrative") {
+          if (state.viewMode === "pipeline" && state.selectedPhase === node.phase && state.activeTab === "narrative") {
             const prevScroll = els.inspectorBody.scrollTop;
             els.inspectorBody.textContent = "";
             if (!data.narrative_markdown) {
@@ -2184,11 +3134,9 @@
             els.inspectorBody.scrollTop = prevScroll;
           }
         } catch (err) {
-          if (state.selectedPhase === node.phase && state.activeTab === "narrative") {
+          if (state.viewMode === "pipeline" && state.selectedPhase === node.phase && state.activeTab === "narrative") {
             els.inspectorBody.textContent = "";
-            els.inspectorBody.appendChild(
-              el("div", "alert-card alert-error", `Failed to load artifact narrative: ${err.message}`)
-            );
+            els.inspectorBody.appendChild(el("div", "alert-card alert-error", `Failed to load artifact narrative: ${err.message}`));
           }
         }
       }
@@ -2208,12 +3156,8 @@
           head.appendChild(el("strong", "inspector-sub", filename));
 
           const badges = el("div", "node-badges");
-          badges.appendChild(
-            el("span", `badge ${rev.verdict === "PASS" ? "badge-pass" : "badge-fail"}`, rev.verdict)
-          );
-          badges.appendChild(
-            el("span", `badge ${rev.is_stale ? "badge-stale" : "badge-neutral"}`, rev.is_stale ? "STALE REVIEW" : "FRESH")
-          );
+          badges.appendChild(el("span", `badge ${rev.verdict === "PASS" ? "badge-pass" : "badge-fail"}`, rev.verdict));
+          badges.appendChild(el("span", `badge ${rev.is_stale ? "badge-stale" : "badge-neutral"}`, rev.is_stale ? "STALE REVIEW" : "FRESH"));
           head.appendChild(badges);
           card.appendChild(head);
 
@@ -2240,7 +3184,6 @@
             card.appendChild(blkBox);
           }
 
-          // Toggleable full review narrative
           const isExpanded = state.expandedReviews.has(filename);
           const toggleBtn = el("button", "btn", isExpanded ? "Hide Audit Narrative" : "View Audit Narrative");
           toggleBtn.type = "button";
@@ -2260,10 +3203,7 @@
 
           card.appendChild(toggleBtn);
           card.appendChild(narrativeHost);
-
-          if (isExpanded) {
-            loadReviewNarrative(filename, rev.mtime_ms, narrativeHost);
-          }
+          if (isExpanded) loadReviewNarrative(filename, rev.mtime_ms, narrativeHost);
 
           els.inspectorBody.appendChild(card);
         }
@@ -2291,12 +3231,11 @@
         }
       }
 
-      function applyGraph(nextGraph) {
+      function applyPipelineGraph(nextGraph) {
         const isFirst = !state.graph;
         state.graph = nextGraph;
 
         if (!state.selectedPhase) {
-          // Pick first actionable node or vision
           const pick =
             nextGraph.nodes.find((n) => n.status === "invalid" || n.status === "reviewed_fail") ||
             nextGraph.nodes.find((n) => n.is_stale) ||
@@ -2305,17 +3244,19 @@
           state.selectedPhase = pick ? pick.phase : null;
         }
 
-        renderSummary();
-        renderDag();
-        renderInspector({ preserveScroll: !isFirst });
-
-        if (isFirst) {
-          requestAnimationFrame(() => fitZoom());
+        if (state.viewMode === "pipeline") {
+          renderPipelineSummary();
+          renderPipelineDag();
+          renderPipelineInspector({ preserveScroll: !isFirst });
+          if (isFirst) requestAnimationFrame(() => fitZoom());
         }
       }
 
+      // =========================================================================
+      // SHARED CONTROLS & SSE
+      // =========================================================================
       function fitZoom() {
-        const stageW = parseFloat(els.dagStage.style.width) || 1800;
+        const stageW = parseFloat(els.dagStage.style.width) || 1200;
         const availW = els.canvasScroller.clientWidth - 48;
         if (availW > 0 && stageW > 0) {
           const ratio = Math.min(1, Math.max(0.28, availW / stageW));
@@ -2324,7 +3265,73 @@
         }
       }
 
-      // Wire controls
+      function syncWorkFilterButtons() {
+        document.querySelectorAll("[data-wfilter]").forEach((btn) => {
+          const active = btn.getAttribute("data-wfilter") === state.workFilter;
+          btn.classList.toggle("active", active);
+          btn.setAttribute("aria-pressed", String(active));
+        });
+        els.btnHideDone.classList.toggle("active", state.hideDone);
+        els.btnHideDone.setAttribute("aria-pressed", String(state.hideDone));
+      }
+
+      els.btnViewWork.addEventListener("click", () =>
+        setViewMode("work", { fromUser: true, autoFit: true })
+      );
+      els.btnViewPipeline.addEventListener("click", () =>
+        setViewMode("pipeline", { fromUser: true, autoFit: true })
+      );
+
+      els.scopeSelect.addEventListener("change", () => {
+        state.workScope = els.scopeSelect.value;
+        renderWorkSummary();
+        renderWorkDag();
+        requestAnimationFrame(() => fitZoom());
+      });
+
+      document.querySelectorAll("[data-wfilter]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          state.workFilter = btn.getAttribute("data-wfilter") || "all";
+          syncWorkFilterButtons();
+          renderWorkDag();
+          requestAnimationFrame(() => fitZoom());
+        });
+      });
+
+      els.btnHideDone.addEventListener("click", () => {
+        state.hideDone = !state.hideDone;
+        syncWorkFilterButtons();
+        renderWorkDag();
+        requestAnimationFrame(() => fitZoom());
+      });
+
+      els.btnCp.addEventListener("click", () => {
+        state.highlightCriticalPath = !state.highlightCriticalPath;
+        els.btnCp.setAttribute("aria-pressed", String(state.highlightCriticalPath));
+        els.btnCp.classList.toggle("active-blast", state.highlightCriticalPath);
+        renderWorkDag();
+      });
+
+      els.btnWorkRefresh.addEventListener("click", async () => {
+        els.btnWorkRefresh.disabled = true;
+        els.btnWorkRefresh.textContent = "Refreshing…";
+        try {
+          const resp = await fetch("/api/work-graph/refresh", { method: "POST" });
+          const data = await resp.json();
+          if (resp.ok) {
+            applyWorkEnvelope(data);
+            showToast("Refreshed work-graph from Linear");
+          } else {
+            showToast(data.error || "Refresh failed");
+          }
+        } catch {
+          showToast("Refresh request failed");
+        } finally {
+          els.btnWorkRefresh.disabled = false;
+          els.btnWorkRefresh.textContent = "Refresh";
+        }
+      });
+
       els.btnMockery.addEventListener("click", () => {
         state.showMockery = !state.showMockery;
         els.btnMockery.setAttribute("aria-pressed", String(state.showMockery));
@@ -2332,15 +3339,15 @@
         if (!state.showMockery && state.selectedPhase === "mockery") {
           state.selectedPhase = "ui";
         }
-        renderDag();
-        renderInspector({ preserveScroll: false });
+        renderPipelineDag();
+        renderPipelineInspector({ preserveScroll: false });
       });
 
       els.btnBlast.addEventListener("click", () => {
         state.highlightBlast = !state.highlightBlast;
         els.btnBlast.setAttribute("aria-pressed", String(state.highlightBlast));
         els.btnBlast.classList.toggle("active-blast", state.highlightBlast);
-        renderDag();
+        renderPipelineDag();
       });
 
       document.getElementById("btn-zoom-in").addEventListener("click", () => {
@@ -2348,7 +3355,7 @@
         els.dagStage.style.transform = `scale(${state.zoom})`;
       });
       document.getElementById("btn-zoom-out").addEventListener("click", () => {
-        state.zoom = Math.max(0.4, Math.round((state.zoom - 0.1) * 100) / 100);
+        state.zoom = Math.max(0.35, Math.round((state.zoom - 0.1) * 100) / 100);
         els.dagStage.style.transform = `scale(${state.zoom})`;
       });
       document.getElementById("btn-zoom-reset").addEventListener("click", () => {
@@ -2365,7 +3372,7 @@
             b.classList.toggle("active", active);
             b.setAttribute("aria-selected", String(active));
           });
-          renderInspector({ preserveScroll: false });
+          renderPipelineInspector({ preserveScroll: false });
         });
       });
 
@@ -2379,22 +3386,25 @@
         es.onopen = () => setSseStatus("connected", "Live");
         es.addEventListener("graph", (ev) => {
           setSseStatus("connected", "Live");
-          try {
-            applyGraph(JSON.parse(ev.data));
-          } catch {}
+          try { applyPipelineGraph(JSON.parse(ev.data)); } catch {}
         });
-        es.onerror = () => {
-          setSseStatus("reconnecting", "Reconnecting…");
-        };
+        es.addEventListener("work_graph", (ev) => {
+          setSseStatus("connected", "Live");
+          try { applyWorkEnvelope(JSON.parse(ev.data)); } catch {}
+        });
+        es.onerror = () => setSseStatus("reconnecting", "Reconnecting…");
       }
 
       async function bootstrap() {
         initTheme();
+        renderLegend();
         try {
-          const resp = await fetch("/api/graph");
-          if (resp.ok) {
-            applyGraph(await resp.json());
-          }
+          const [pipeResp, workResp] = await Promise.all([
+            fetch("/api/graph"),
+            fetch("/api/work-graph"),
+          ]);
+          if (pipeResp.ok) applyPipelineGraph(await pipeResp.json());
+          if (workResp.ok) applyWorkEnvelope(await workResp.json());
         } catch {}
         connectSse();
       }
