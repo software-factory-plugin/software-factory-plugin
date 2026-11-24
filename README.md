@@ -52,23 +52,28 @@ flowchart LR
 | `sf-architecture` | `architecture` | `sf-prd`, `sf-ux`, `sf-ui`, `sf-vision` (`sf-brd` recommended; `sf-mockery` optional) | `frontend_stack`, `backend_stack`, `database_type`, `data_models`, `core_endpoints` | `docs/factory/07-architecture.md` |
 | `sf-specs` | `specs` | `sf-prd`, `sf-architecture`, `sf-vision` | `openapi_stubs`, `required_unit_tests`, `required_e2e_tests`, `linter_rules` | `docs/factory/08-specs.md` |
 | `sf-review` | `review` | 1+ upstream Source artifact(s) + 1 Target artifact | `source_phases`, `target_phase`, `verdict`, `critical_violations_count`, `scope_creep_warnings_count`, `blocking_issues` | `docs/factory/reviews/<source>-vs-<target>-review.md` |
-| `sf-tree` *(read-only)* | *(inspector)* | Existing workspace `docs/factory/` (optional; handles empty repos) | v1 Graph JSON (`nodes`, `edges`, `summary`, `mockery`), Mermaid DAG, ASCII tree, or live web UI | *(read-only; writes zero files)* |
+| `sf-tree` *(read-only)* | *(inspector)* | Workspace `docs/factory/` and/or Linear / `work-graph` v1 JSON | Dual-mode v1 JSON (Work Tech-Tree & Pipeline Stages), Mermaid DAG, ASCII tree, or live web UI | *(read-only; writes zero repo files)* |
 
 ## Live Project & Tech-Tree View (`sf-tree`)
 
-Invoke `sf-tree` at any point to inspect pipeline progress, `<system_state>` validity, `sf-review` gates, upstream-to-downstream staleness blast radius, and optional Stage 6b `sf-mockery` parity—powered by zero-dependency Node.js 20+ scripts under `skills/sf-tree/scripts/`:
+Invoke `sf-tree` at any point to visualize either your **Work-Item / Ticket Dependency Tech-Tree** (Linear projects, milestones, `blocks`/`blockedBy` chains, ready vs. blocked work, estimate-weighted remaining Critical Path) or your **01–08 Pipeline Stages** (`docs/factory/` progress, `<system_state>` validity, `sf-review` gates, staleness blast radius, and Stage 6b Mockery parity)—powered by zero-dependency Node.js 20+ scripts under `skills/sf-tree/scripts/`:
 
-- **Snapshot Mode (default):** Emits a concise status summary (completed stages, unlocked next stages, stale/failing review gates, semantic warnings) plus a color-coded Mermaid DAG in chat. On Antigravity, the agent may optionally render a compact (`<= 450px`) inline interactive widget from `--json`.
-- **Live Local Web Viewer (`--serve`):** Starts a strictly read-only HTTP + Server-Sent Events server on `127.0.0.1` (default port `4173` with automatic free-port fallback) watching `docs/factory/`, `docs/factory/reviews/`, and `docs/factory/mockups/flow.json`. Includes a layered SVG/HTML DAG, light/dark themes, upstream/downstream & **Highlight Stale Blast Radius** toggles, a 3-tab inspector (**Overview/`<system_state>`**, XSS-safe **Narrative**, **Reviews**), 1-click **Copy Prompt** helpers, and Stage 6b Mockery viewer/check shortcuts.
-- **Cross-Harness Graceful Degradation:** Identical `--json`, `--mermaid`, `--ascii`, and `--serve` behavior across Antigravity, Claude Code, and Gemini CLI with zero external npm dependencies. If Node.js 20+ is unavailable, `sf-tree` falls back to reading `docs/factory/*.md` directly and emitting the status summary + Mermaid DAG manually.
+- **Work Tech-Tree Mode (`--work-graph` / `--linear-project` / `--linear-team`):** Normalizes Linear MCP snapshots (`--work-graph <scratch-path>`, zero API keys required) or optional live Linear GraphQL (`LINEAR_API_KEY`, Node 20 native `fetch`) into canonical `work-graph` v1 JSON, computes deterministic Kahn's topological tiers (with cycle guard), derives `DONE` / `IN REVIEW` / `IN PROGRESS` / `READY` / `BLOCKED` status, and calculates the estimate-weighted remaining Critical Path.
+- **Pipeline Stages Mode (`--dir`):** Emits a concise status summary (completed stages, unlocked next stages, stale/failing review gates, semantic warnings) plus a color-coded Mermaid DAG in chat.
+- **Dual-Mode Live Local Web Viewer (`--serve`):** Starts a strictly read-only HTTP + Server-Sent Events server on `127.0.0.1` (default port `4173` with automatic free-port fallback) featuring a **Work Tech-Tree | Pipeline Stages** switcher, Project/Milestone filter dropdown, Quick Filters (`All`, `Ready to Start`, `In Progress`, `Blocked`, `Hide Done`), **Highlight Critical Path** & **Highlight Stale Blast Radius** toggles, clickable Blocker/Unlock jump links, allowlisted `https://` Linear/PR deep links, XSS-safe Markdown preview, and 1-click **Copy Prompt** helpers.
+- **Cross-Harness Graceful Degradation:** Identical `--json`, `--mermaid`, `--ascii`, and `--serve` behavior across Antigravity, Claude Code, and Gemini CLI with zero external npm dependencies and zero repo pollution.
 
 ```bash
-# Snapshot outputs (JSON contract, color-coded Mermaid DAG, or terminal ASCII)
-node skills/sf-tree/scripts/cli.mjs --dir /path/to/repo --json
-node skills/sf-tree/scripts/cli.mjs --dir /path/to/repo --mermaid
-node skills/sf-tree/scripts/cli.mjs --dir /path/to/repo --ascii
+# Work Tech-Tree from an agent-generated Linear MCP snapshot (or docs/factory/work-graph.json)
+node skills/sf-tree/scripts/cli.mjs --work-graph /path/to/scratch/work-graph.json --mermaid
+node skills/sf-tree/scripts/cli.mjs --dir /path/to/repo --work-graph /path/to/scratch/work-graph.json --serve --port 4173
 
-# Launch the live hot-reloading web viewer on 127.0.0.1:4173 (add --no-open for headless)
+# Optional direct Linear GraphQL polling (reads LINEAR_API_KEY from env; never persisted)
+node skills/sf-tree/scripts/cli.mjs --linear-team SOF --serve --port 4173 --poll-ms 30000
+
+# Pipeline Stages snapshot outputs or live viewer
+node skills/sf-tree/scripts/cli.mjs --dir /path/to/repo --view pipeline --json
+node skills/sf-tree/scripts/cli.mjs --dir /path/to/repo --view pipeline --mermaid
 node skills/sf-tree/scripts/cli.mjs --dir /path/to/repo --serve --port 4173
 ```
 
@@ -141,7 +146,7 @@ Then commit and push a matching Git tag (for example, `v0.1.0`).
 Active roadmap planning, design specs, and issue tracking live in [Linear (`SOF`)](https://linear.app/software-factory-plugin):
 
 - **Mockery Integration (Shipped):** Optional `sf-mockery` bridge skill connecting interactive Mockery flow canvases into UX/UI, `sf-review`, and `sf-architecture`.
-- **Live Project & Tech-Tree View (Shipped):** Read-only `sf-tree` skill and zero-dep Node 20+ DAG analyzer/live SSE web viewer for pipeline status, staleness blast radius, `sf-review` gates, and Mockery parity.
+- **Live Project & Tech-Tree View (Shipped):** Dual-mode read-only `sf-tree` skill and zero-dep Node 20+ DAG analyzer/live SSE web viewer covering both Work-Item / Linear Dependency Tech-Trees (topological tiers, ready vs. blocked work, Critical Path) and 01–08 Pipeline Stages (staleness blast radius, `sf-review` gates, Mockery parity).
 - **Agile Sizing & Token/Cost Telemetry:** Fibonacci sizing calibration paired with actual LLM token, cost, and rework tracking.
 - **Prompting Guide & Evals:** End-to-end prompting handbook and automated evaluation suite for skill output quality and `<system_state>` fidelity.
 - **Marketplace Publishing:** Packaging, validation, and distribution across Antigravity, Claude Code, and Gemini CLI marketplaces.
