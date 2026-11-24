@@ -1,6 +1,10 @@
+<p align="center">
+  <img src="assets/logo.svg" alt="Software Factory Logo" width="84" height="84" />
+</p>
+
 # Software Factory (`software-factory`)
 
-A lightweight, Directed Acyclic Graph (DAG) suite of agentic skills for building software through staged, human-validated phases without schema bloat or context drift.
+A lightweight, MIT-licensed, Directed Acyclic Graph (DAG) suite of agentic skills for building software through staged, human-validated phases without schema bloat or context drift.
 
 ## Core Design Principles
 
@@ -163,19 +167,30 @@ gemini extensions link .
 
 ### Releasing a New Version
 
-Keep `version` synchronized across all three manifests before tagging a release:
-1. `plugin.json`
-2. `.claude-plugin/plugin.json`
-3. `gemini-extension.json`
+Keep `version` synchronized across all three manifests and `README.md` using the bundled zero-dependency sync helper before tagging:
 
-Then commit and push a matching Git tag (for example, `v0.1.0`).
+```bash
+# Sync plugin.json, .claude-plugin/plugin.json, gemini-extension.json, and README.md
+node scripts/bump-version.mjs 0.7.0
+
+# Verify version parity, evals, and strict plugin validation
+node scripts/bump-version.mjs --check
+node evals/run.mjs --ascii
+agy plugin validate --strict .
+```
+
+Then commit and push a matching annotated Git tag and GitHub Release (for example, `v0.7.0`).
 
 ## Roadmap
 
 Active roadmap planning, design specs, and issue tracking live in [Linear (`SOF`)](https://linear.app/software-factory-plugin):
 
-- **Mockery Integration (Shipped):** Optional `sf-mockery` bridge skill connecting interactive Mockery flow canvases into UX/UI, `sf-review`, and `sf-architecture`.
-- **Live Project & Tech-Tree View (Shipped):** Dual-mode read-only `sf-tree` skill and zero-dep Node 20+ DAG analyzer/live SSE web viewer covering both Work-Item / Linear Dependency Tech-Trees (topological tiers, ready vs. blocked work, Critical Path) and 01–08 Pipeline Stages (staleness blast radius, `sf-review` gates, Mockery parity).
-- **Agile Sizing & Token/Cost Telemetry (Shipped):** On-demand `sf-telemetry` skill and zero-dep Node 20+ CLI pairing Fibonacci sizing (`1, 2, 3, 5, 8`) with offline token/cost pricing, Linear bootstrap & transcript parsers, out-of-repo JSONL storage, and calibration/blowup reports.
-- **Prompting Guide & Evals (Shipped):** Comprehensive operator handbook (`docs/PROMPTING_GUIDE.md`) plus zero-dep Node 20+ automated eval suite (`evals/run.mjs`, golden PulseBoard fixtures, 4 suites, GitHub Actions CI) verifying frontmatter, `<system_state>` fidelity, Missing-Input Guards, `sf-review` vectors, and idle-router token budgets.
-- **Marketplace Publishing:** Packaging, validation, and distribution across Antigravity, Claude Code, and Gemini CLI marketplaces.
+- **Mockery Integration (Shipped — `v0.2.0`):** Optional `sf-mockery` bridge skill connecting interactive Mockery flow canvases into UX/UI, `sf-review`, and `sf-architecture`.
+- **Live Project & Tech-Tree View (Shipped — `v0.3.0` / `v0.4.0`):** Dual-mode read-only `sf-tree` skill and zero-dep Node 20+ DAG analyzer/live SSE web viewer covering both Work-Item / Linear Dependency Tech-Trees (topological tiers, ready vs. blocked work, Critical Path) and 01–08 Pipeline Stages (staleness blast radius, `sf-review` gates, Mockery parity).
+- **Agile Sizing & Token/Cost Telemetry (Shipped — `v0.5.0`):** On-demand `sf-telemetry` skill and zero-dep Node 20+ CLI pairing Fibonacci sizing (`1, 2, 3, 5, 8`) with offline token/cost pricing, Linear bootstrap & transcript parsers, out-of-repo JSONL storage, and calibration/blowup reports.
+- **Prompting Guide & Evals (Shipped — `v0.6.0`):** Comprehensive operator handbook (`docs/PROMPTING_GUIDE.md`) plus zero-dep Node 20+ automated eval suite (`evals/run.mjs`, golden PulseBoard fixtures, 4 suites, GitHub Actions CI) verifying frontmatter, `<system_state>` fidelity, Missing-Input Guards, `sf-review` vectors, and idle-router token budgets.
+- **Marketplace Publishing (Shipped — `v0.7.0`):** MIT `LICENSE`, minimal SVG logo (`assets/logo.svg`), cross-harness manifests (Antigravity, Claude Code, Gemini CLI), release version-sync automation, community templates, and zero-warning strict validation.
+
+## License
+
+MIT License — see [`LICENSE`](LICENSE). Contributions welcome via [`CONTRIBUTING.md`](CONTRIBUTING.md).

@@ -105,6 +105,26 @@ export function runSkillsAudit(repoRoot) {
     `Plugin name across manifests: ${[...names].join(", ")}`
   );
 
+  // 2b. Packaging assets & MIT license checks
+  const licenseExists = fs.existsSync(path.join(repoRoot, "LICENSE"));
+  add(
+    "packaging:license-exists",
+    licenseExists,
+    licenseExists ? "LICENSE file present" : "Missing root LICENSE file"
+  );
+  const logoRel = manifests[0]?.data?.logo;
+  const logoExists =
+    typeof logoRel === "string" &&
+    logoRel.length > 0 &&
+    fs.existsSync(path.join(repoRoot, logoRel));
+  add(
+    "packaging:logo-exists",
+    logoExists,
+    logoExists
+      ? `plugin.json logo "${logoRel}" present`
+      : `Missing or unreferenced logo asset (${String(logoRel)})`
+  );
+
   // 3. Skill directory & frontmatter checks
   const skillsDir = path.join(repoRoot, "skills");
   const actualDirs = fs
