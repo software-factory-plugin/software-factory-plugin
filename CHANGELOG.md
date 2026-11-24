@@ -2,6 +2,13 @@
 
 All notable changes to `software-factory-plugin` are documented in this file.
 
+## [0.7.1] — 2026-11-24
+
+### Added (Cross-Harness Marketplace Expansion)
+- Added OpenAI Codex plugin manifest (`.codex-plugin/plugin.json`) and marketplace catalog (`.agents/plugins/marketplace.json`).
+- Added self-hosted Claude Code marketplace catalog (`.claude-plugin/marketplace.json`, `"source": "./"`).
+- Extended `scripts/bump-version.mjs` and `evals/suites/skills-audit.mjs` to validate and synchronize all 6 plugin/marketplace manifests alongside `README.md`.
+
 ## [0.7.0] — 2026-11-24
 
 ### Added (Track #6 — Marketplace Publishing)

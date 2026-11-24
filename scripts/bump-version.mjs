@@ -6,19 +6,35 @@ import { fileURLToPath } from "node:url";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_REPO_ROOT = path.resolve(SCRIPT_DIR, "..");
-const MANIFEST_FILES = [
+
+const PLUGIN_MANIFEST_FILES = [
   "plugin.json",
   ".claude-plugin/plugin.json",
+  ".codex-plugin/plugin.json",
   "gemini-extension.json",
 ];
+
+const MARKETPLACE_FILES = [
+  ".claude-plugin/marketplace.json",
+  ".agents/plugins/marketplace.json",
+];
+
 const SEMVER_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 const README_TAG_RE = /(software-factory-plugin\/tree\/v)(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)/g;
 
 export function checkVersions(repoRoot = DEFAULT_REPO_ROOT) {
   const versions = {};
-  for (const rel of MANIFEST_FILES) {
+  for (const rel of PLUGIN_MANIFEST_FILES) {
     const data = JSON.parse(fs.readFileSync(path.join(repoRoot, rel), "utf8"));
     versions[rel] = data.version;
+  }
+
+  for (const rel of MARKETPLACE_FILES) {
+    const data = JSON.parse(fs.readFileSync(path.join(repoRoot, rel), "utf8"));
+    const entry = Array.isArray(data.plugins)
+      ? data.plugins.find((p) => p?.name === "software-factory")
+      : null;
+    versions[rel] = entry ? entry.version : null;
   }
 
   const readmePath = path.join(repoRoot, "README.md");
@@ -26,11 +42,11 @@ export function checkVersions(repoRoot = DEFAULT_REPO_ROOT) {
   const tagMatch = readme.match(/software-factory-plugin\/tree\/v(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)/);
   const readmeVersion = tagMatch ? tagMatch[1] : null;
 
-  const unique = new Set([...Object.values(versions), readmeVersion].filter(Boolean));
+  const allValues = [...Object.values(versions), readmeVersion];
+  const unique = new Set(allValues.filter(Boolean));
   const ok =
     unique.size === 1 &&
-    Object.values(versions).every((v) => typeof v === "string" && SEMVER_RE.test(v)) &&
-    readmeVersion !== null;
+    allValues.every((v) => typeof v === "string" && SEMVER_RE.test(v));
 
   return {
     ok,
@@ -42,13 +58,26 @@ export function checkVersions(repoRoot = DEFAULT_REPO_ROOT) {
 
 export function syncVersions(newVersion, repoRoot = DEFAULT_REPO_ROOT) {
   if (!SEMVER_RE.test(newVersion)) {
-    throw new Error(`Invalid SemVer version "${newVersion}" (expected e.g. 0.7.0)`);
+    throw new Error(`Invalid SemVer version "${newVersion}" (expected e.g. 0.7.1)`);
   }
 
-  for (const rel of MANIFEST_FILES) {
+  for (const rel of PLUGIN_MANIFEST_FILES) {
     const full = path.join(repoRoot, rel);
     const data = JSON.parse(fs.readFileSync(full, "utf8"));
     data.version = newVersion;
+    fs.writeFileSync(full, JSON.stringify(data, null, 2) + "\n", "utf8");
+  }
+
+  for (const rel of MARKETPLACE_FILES) {
+    const full = path.join(repoRoot, rel);
+    const data = JSON.parse(fs.readFileSync(full, "utf8"));
+    if (Array.isArray(data.plugins)) {
+      for (const p of data.plugins) {
+        if (p && p.name === "software-factory") {
+          p.version = newVersion;
+        }
+      }
+    }
     fs.writeFileSync(full, JSON.stringify(data, null, 2) + "\n", "utf8");
   }
 
@@ -76,7 +105,9 @@ if (isDirectRun) {
   if (args[0] === "--check") {
     const res = checkVersions();
     if (res.ok) {
-      process.stdout.write(`Version sync OK: v${res.version} across all 3 manifests and README.md\n`);
+      process.stdout.write(
+        `Version sync OK: v${res.version} across all ${Object.keys(res.manifests).length} manifests and README.md\n`
+      );
       process.exit(0);
     } else {
       process.stderr.write(
@@ -92,7 +123,9 @@ if (isDirectRun) {
       process.stderr.write(`Sync verification failed:\n${JSON.stringify(res, null, 2)}\n`);
       process.exit(1);
     }
-    process.stdout.write(`Synced all 3 manifests and README.md to v${res.version}\n`);
+    process.stdout.write(
+      `Synced all ${Object.keys(res.manifests).length} manifests and README.md to v${res.version}\n`
+    );
   } catch (err) {
     process.stderr.write(`Error: ${err.message}\n`);
     process.exit(1);

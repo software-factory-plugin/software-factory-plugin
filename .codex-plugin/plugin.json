@@ -1,0 +1,30 @@
+{
+  "name": "software-factory",
+  "version": "0.7.1",
+  "description": "Lightweight DAG-based software factory pipeline (Vision, Market Research, BRD, PRD, UX, UI, optional interactive Mockery prototypes, Architecture, Agentic TDD Specs, Adversarial Red Team Review, dual-mode sf-tree Work-Item & Pipeline tech-tree visualization, and sf-telemetry Agile Sizing & Token/Cost Calibration) using 80/20 hybrid artifacts and strict <system_state> handoffs.",
+  "author": {
+    "name": "jamesconant",
+    "url": "https://github.com/software-factory-plugin/software-factory-plugin"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Software Factory",
+    "shortDescription": "12-skill DAG software pipeline with strict <system_state> handoffs, Red Team review, sf-tree, and sf-telemetry.",
+    "longDescription": "Lightweight Directed Acyclic Graph (DAG) suite of 12 on-demand skills (sf-vision through sf-specs, optional sf-mockery prototypes, universal sf-review Red Team auditor, dual-mode sf-tree Work-Item & Pipeline tech-tree viewer, and sf-telemetry Agile Sizing & Token/Cost calibration) with zero idle token overhead and Node.js 20+ stdlib-only scripts.",
+    "developerName": "jamesconant",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/software-factory-plugin/software-factory-plugin",
+    "defaultPrompt": [
+      "Start a new Software Factory project with a Product Vision & Charter",
+      "Visualize my Linear project dependencies, ready tickets, and Critical Path in sf-tree",
+      "Run a Red Team adversarial review comparing my PRD against my System Architecture"
+    ],
+    "brandColor": "#0EA5E9",
+    "composerIcon": "./assets/logo.svg",
+    "logo": "./assets/logo.svg"
+  }
+}
