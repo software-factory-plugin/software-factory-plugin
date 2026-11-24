@@ -1169,6 +1169,9 @@ export function readReviewDetail(workspaceRoot, filename) {
   } catch {
     return { error: "not_found", status: 404 };
   }
+  if (lstat.isSymbolicLink()) {
+    return { error: "invalid_filename", status: 400 };
+  }
   if (!lstat.isFile()) {
     return { error: "not_found", status: 404 };
   }
