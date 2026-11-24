@@ -1,0 +1,19 @@
+{
+  "title": "PulseBoard Interactive Flow",
+  "devices": { "desktop": { "width": 1280, "height": 800 } },
+  "sections": [
+    { "id": "admin", "label": "Admin" },
+    { "id": "public", "label": "Public" }
+  ],
+  "nodes": [
+    { "id": "admin-dashboard", "file": "screens/admin-dashboard.html", "device": "desktop", "section": "admin" },
+    { "id": "monitor-drawer", "file": "screens/monitor-drawer.html", "device": "desktop", "section": "admin" },
+    { "id": "incident-detail", "file": "screens/incident-detail.html", "device": "desktop", "section": "admin" },
+    { "id": "public-status", "file": "screens/public-status.html", "device": "desktop", "section": "public" }
+  ],
+  "edges": [
+    { "from": "admin-dashboard", "to": "monitor-drawer", "label": "New Monitor" },
+    { "from": "admin-dashboard", "to": "incident-detail", "label": "Inspect Incident" },
+    { "from": "admin-dashboard", "to": "public-status", "label": "View Public Page" }
+  ]
+}
