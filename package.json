@@ -7,6 +7,7 @@
   },
   "scripts": {
     "test": "node --test --test-timeout=30000 tests/*.test.mjs",
+    "test:e2e": "node --test --test-timeout=60000 tests/e2e/*.test.mjs",
     "eval": "node evals/run.mjs --ascii",
     "version:check": "node scripts/bump-version.mjs --check",
     "check": "npm run version:check && npm run eval && npm test"

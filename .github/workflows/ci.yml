@@ -39,6 +39,8 @@ jobs:
         run: node evals/run.mjs --ascii
       - name: Run zero-dependency runtime & security test suite
         run: node --test --test-timeout=30000 tests/*.test.mjs
+      - name: Run zero-dependency headless Chrome E2E suite
+        run: node --test --test-timeout=60000 tests/e2e/*.test.mjs
 
   release-tag-guard:
     name: Release Tag Version Parity

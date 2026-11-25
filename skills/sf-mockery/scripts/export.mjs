@@ -1,7 +1,7 @@
 // Standalone single-file HTML exporter for Mockery projects.
 // Compiles flow.json, tokens.css, kit.css, optional fonts.css, components/*.html,
-// screens/*.html, local assets/*, and the Mockery viewer into one self-contained HTML file
-// that opens directly via file:// with zero server, Node, or network required.
+// screens/*.html, deduplicated local assets/*, and the Mockery viewer into one
+// self-contained HTML file that opens directly via file:// with zero server, Node, or network required.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -12,8 +12,10 @@ import { MIME_TYPES, deriveProjectName } from './server.mjs';
 
 const SCRIPTS_ROOT = path.dirname(fileURLToPath(import.meta.url));
 const VIEWER_DIR = path.join(SCRIPTS_ROOT, 'viewer');
+const DEFAULT_MAX_ASSET_BYTES = 20 * 1024 * 1024; // 20 MB total raw asset cap
 
-const escStyle = (css) => String(css).replace(/<\/style/gi, '<\\/style');
+const normalizeLf = (s) => String(s ?? '').replace(/\r\n?/g, '\n');
+const escStyle = (css) => normalizeLf(css).replace(/<\/style/gi, '<\\/style');
 const escScriptJson = (obj) =>
   JSON.stringify(obj)
     .replace(/</g, '\\u003c')
@@ -23,18 +25,22 @@ const escScriptJson = (obj) =>
     .replace(/\u2029/g, '\\u2029');
 
 const sha256Csp = (content) =>
-  `'sha256-${crypto.createHash('sha256').update(content, 'utf8').digest('base64')}'`;
+  `'sha256-${crypto.createHash('sha256').update(normalizeLf(content), 'utf8').digest('base64')}'`;
 
 const sortEntries = (entries) =>
   entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 
-function collectAssets(absRoot) {
-  const dataUriMap = new Map();
+function collectAssets(absRoot, { maxAssetBytes = DEFAULT_MAX_ASSET_BYTES } = {}) {
+  const assets = {};
+  let totalBytes = 0;
+  let count = 0;
   const dirResolved = resolveContainedPath(absRoot, 'assets', {
     allowSymlinks: false,
     requireFile: false,
   });
-  if (!dirResolved.ok || !dirResolved.stat.isDirectory()) return dataUriMap;
+  if (!dirResolved.ok || !dirResolved.stat.isDirectory()) {
+    return { assets, count, totalBytes };
+  }
   const realRoot = fs.realpathSync(absRoot);
 
   const walk = (dir) => {
@@ -45,48 +51,25 @@ function collectAssets(absRoot) {
       if (entry.isDirectory()) {
         walk(full);
       } else if (entry.isFile()) {
+        const buf = fs.readFileSync(full);
+        totalBytes += buf.length;
+        if (Number.isFinite(maxAssetBytes) && maxAssetBytes > 0 && totalBytes > maxAssetBytes) {
+          throw new Error(
+            `total local assets exceed maxAssetBytes (${totalBytes} > ${maxAssetBytes}); trim assets/ or raise maxAssetBytes`,
+          );
+        }
         const rel = toPosixPath(path.relative(realRoot, full));
         const mime = MIME_TYPES[path.extname(entry.name).toLowerCase()] || 'application/octet-stream';
-        const b64 = fs.readFileSync(full).toString('base64');
-        dataUriMap.set(rel, `data:${mime};base64,${b64}`);
+        assets[rel] = `data:${mime};base64,${buf.toString('base64')}`;
+        count += 1;
       }
     }
   };
   walk(dirResolved.realPath);
-  return dataUriMap;
+  return { assets, count, totalBytes };
 }
 
-function inlineAssetRefs(text, assetMap) {
-  if (!text || assetMap.size === 0) return text;
-
-  const resolveAsset = (rawRel, suffix = '') => {
-    if (suffix && suffix.includes('#')) return null; // preserve SVG/HTML #fragment references
-    const normalized = rawRel.replace(/^(?:(?:\.\.\/)+|\.\/|\/)/, '');
-    return assetMap.has(normalized) ? assetMap.get(normalized) : null;
-  };
-
-  // 1. CSS url(...) references (quoted or unquoted), anchored at url(...) boundary
-  let out = text.replace(
-    /url\(\s*(["']?)((?:(?:\.\.\/)+|\.\/|\/)?assets\/[^"'()\s<>#?]+)([?#][^"'()\s<>]*)?\1\s*\)/gi,
-    (match, quote, rawRel, suffix) => {
-      const uri = resolveAsset(rawRel, suffix);
-      return uri ? `url(${quote}${uri}${quote})` : match;
-    },
-  );
-
-  // 2. HTML quoted attribute values (e.g. src="/assets/logo.png", href="../assets/pic.webp")
-  out = out.replace(
-    /(=\s*)(["'])((?:(?:\.\.\/)+|\.\/|\/)?assets\/[^"'<>#?\s]+)([?#][^"'<>\s]*)?\2/gi,
-    (match, eq, quote, rawRel, suffix) => {
-      const uri = resolveAsset(rawRel, suffix);
-      return uri ? `${eq}${quote}${uri}${quote}` : match;
-    },
-  );
-
-  return out;
-}
-
-function collectHtmlDir(absRoot, subdir, assetMap) {
+function collectHtmlDir(absRoot, subdir) {
   const out = {};
   const dirResolved = resolveContainedPath(absRoot, subdir, {
     allowSymlinks: false,
@@ -104,7 +87,7 @@ function collectHtmlDir(absRoot, subdir, assetMap) {
         walk(full);
       } else if (entry.isFile() && entry.name.endsWith('.html')) {
         const rel = toPosixPath(path.relative(realRoot, full));
-        out[rel] = inlineAssetRefs(fs.readFileSync(full, 'utf8'), assetMap);
+        out[rel] = fs.readFileSync(full, 'utf8');
       }
     }
   };
@@ -113,7 +96,7 @@ function collectHtmlDir(absRoot, subdir, assetMap) {
 }
 
 function stripModuleSyntax(src) {
-  return src
+  return normalizeLf(src)
     .replace(/^\s*import\s+[\s\S]*?from\s+['"][^'"]+['"];?\s*$/gm, '')
     .replace(/^\s*export\s+(?=(?:async\s+)?(?:function|const|let|var|class)\b)/gm, '');
 }
@@ -132,9 +115,9 @@ function buildInlineViewerScript() {
     cameraSrc,
     '    return { createCamera };',
     '  })();',
-    '  const { sharedSheet, isSharedStyle, loadSharedStyles, invalidate, renderScreen } = (function() {',
+    '  const { sharedSheet, isSharedStyle, loadSharedStyles, invalidate, renderScreen, resolveBundledAssetRefs, sanitizeHtmlFragment } = (function() {',
     screensSrc,
-    '    return { sharedSheet, isSharedStyle, loadSharedStyles, invalidate, renderScreen };',
+    '    return { sharedSheet, isSharedStyle, loadSharedStyles, invalidate, renderScreen, resolveBundledAssetRefs, sanitizeHtmlFragment };',
     '  })();',
     '  const { anchorSelector, drawEdges } = (function() {',
     edgesSrc,
@@ -154,7 +137,10 @@ function buildInlineViewerScript() {
   ].join('\n');
 }
 
-export function exportProject(root, { outFile, title, includeTimestamp = false } = {}) {
+export function exportProject(
+  root,
+  { outFile, title, includeTimestamp = false, maxAssetBytes = DEFAULT_MAX_ASSET_BYTES } = {},
+) {
   const absRoot = path.resolve(root);
   const flowResolved = resolveContainedPath(absRoot, 'flow.json', {
     allowSymlinks: false,
@@ -178,23 +164,24 @@ export function exportProject(root, { outFile, title, includeTimestamp = false }
     throw new Error(`invalid flow.json: ${err.message}`);
   }
 
-  const assetMap = collectAssets(absRoot);
+  // Collect every local asset ONCE into bundlePayload.assets (no base64 duplication across screens/CSS).
+  const { assets, count: assetCount, totalBytes: assetBytes } = collectAssets(absRoot, { maxAssetBytes });
   const files = {};
 
-  for (const styleFile of ['tokens.css', 'kit.css']) {
+  for (const styleFile of ['tokens.css', 'kit.css', 'fonts.css']) {
     const resolved = resolveContainedPath(absRoot, styleFile, {
       allowSymlinks: false,
       requireFile: true,
     });
     if (resolved.ok) {
-      files[styleFile] = inlineAssetRefs(fs.readFileSync(resolved.realPath, 'utf8'), assetMap);
+      files[styleFile] = fs.readFileSync(resolved.realPath, 'utf8');
     }
   }
 
-  const components = collectHtmlDir(absRoot, 'components', assetMap);
+  const components = collectHtmlDir(absRoot, 'components');
   Object.assign(files, components);
 
-  const screens = collectHtmlDir(absRoot, 'screens', assetMap);
+  const screens = collectHtmlDir(absRoot, 'screens');
   Object.assign(files, screens);
 
   // Verify every flow.json node's screen file exists safely inside project root and is bundled.
@@ -214,18 +201,10 @@ export function exportProject(root, { outFile, title, includeTimestamp = false }
       throw new Error(`node "${n.id}" screen path is not allowed (${resolved.reason}): ${rel}`);
     }
     if (!Object.prototype.hasOwnProperty.call(files, resolved.clean)) {
-      files[resolved.clean] = inlineAssetRefs(fs.readFileSync(resolved.realPath, 'utf8'), assetMap);
+      files[resolved.clean] = fs.readFileSync(resolved.realPath, 'utf8');
       screenCount++;
     }
   }
-
-  const fontsResolved = resolveContainedPath(absRoot, 'fonts.css', {
-    allowSymlinks: false,
-    requireFile: true,
-  });
-  const fontsCss = fontsResolved.ok
-    ? inlineAssetRefs(fs.readFileSync(fontsResolved.realPath, 'utf8'), assetMap)
-    : '';
 
   const viewerCss = fs.readFileSync(path.join(VIEWER_DIR, 'viewer.css'), 'utf8');
   const viewerScript = buildInlineViewerScript();
@@ -233,11 +212,12 @@ export function exportProject(root, { outFile, title, includeTimestamp = false }
   const projectId = `standalone:${projectName}`;
 
   const bundlePayload = {
-    version: 1,
+    version: 2,
     ...(includeTimestamp ? { exportedAt: new Date().toISOString() } : {}),
     projectName,
     flow,
     files,
+    assets,
   };
 
   const bundleScriptBody = `window.__MOCKERY_BUNDLE__ = ${escScriptJson(bundlePayload)};`;
@@ -256,12 +236,11 @@ export function exportProject(root, { outFile, title, includeTimestamp = false }
     "form-action 'none'",
   ].join('; ');
 
-  const shellHtml = fs.readFileSync(path.join(VIEWER_DIR, 'index.html'), 'utf8');
+  const shellHtml = normalizeLf(fs.readFileSync(path.join(VIEWER_DIR, 'index.html'), 'utf8'));
   const inlineStyles = [
     `  <meta http-equiv="Content-Security-Policy" content="${escHtml(exportCsp)}">`,
     `  <style>\n${escStyle(viewerCss)}\n  </style>`,
-    fontsCss ? `  <style>\n${escStyle(fontsCss)}\n  </style>` : '',
-  ].filter(Boolean).join('\n');
+  ].join('\n');
 
   const html = shellHtml
     .replaceAll('{{project-id}}', () => escHtml(projectId))
@@ -290,7 +269,8 @@ export function exportProject(root, { outFile, title, includeTimestamp = false }
       edges: Array.isArray(flow.edges) ? flow.edges.length : 0,
       screens: screenCount,
       components: Object.keys(components).length,
-      assets: assetMap.size,
+      assets: assetCount,
+      assetBytes,
     },
   };
 }
