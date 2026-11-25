@@ -6,6 +6,7 @@ import { EventEmitter } from "node:events";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 
 import { checkProject, expandIncludes } from "../skills/sf-mockery/scripts/check.mjs";
@@ -14,7 +15,7 @@ import { serve } from "../skills/sf-mockery/scripts/server.mjs";
 import { findProject } from "../skills/sf-mockery/scripts/cli.mjs";
 import { anchorSelector } from "../skills/sf-mockery/scripts/viewer/edges.js";
 
-const REPO_ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PULSEBOARD_MOCKUPS = path.join(REPO_ROOT, "evals", "fixtures", "pulseboard", "mockups");
 const MOCKERY_CLI = path.join(REPO_ROOT, "skills", "sf-mockery", "scripts", "cli.mjs");
 

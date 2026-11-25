@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   analyzeWorkGraph,
@@ -25,7 +26,7 @@ import {
 } from "../skills/sf-tree/scripts/linear-adapter.mjs";
 import { analyzeWorkspace } from "../skills/sf-tree/scripts/analyzer.mjs";
 
-const REPO_ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PULSEBOARD_DIR = path.join(REPO_ROOT, "evals", "fixtures", "pulseboard");
 
 function makeTempDir(prefix = "sf-tree-work-") {
