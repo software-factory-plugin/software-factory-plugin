@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Software Factory — Live Tech-Tree View</title>
+  <link rel="stylesheet" href="/ui/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand-group">
+        <div class="brand-mark" aria-hidden="true">SF</div>
+        <div class="project-meta">
+          <div id="project-name" class="project-title">Loading…</div>
+          <div id="workspace-root" class="project-sub">sf-tree</div>
+        </div>
+        <div class="view-switcher" role="tablist" aria-label="View Mode">
+          <button type="button" id="btn-view-work" class="view-btn" role="tab" aria-selected="false">Work Tech-Tree</button>
+          <button type="button" id="btn-view-pipeline" class="view-btn active" role="tab" aria-selected="true">Pipeline Stages</button>
+        </div>
+      </div>
+
+      <!-- Pipeline Summary Metrics -->
+      <div class="summary-metrics" id="pipeline-metrics">
+        <span class="metric-pill" id="metric-core">
+          <span id="metric-core-text">0/8 Core</span>
+          <span class="progress-bar-track"><span id="metric-core-fill" class="progress-bar-fill"></span></span>
+        </span>
+        <span class="metric-pill" id="metric-unlocked">Unlocked: 0</span>
+        <span class="metric-pill" id="metric-stale">Stale: 0</span>
+        <span class="metric-pill hidden" id="metric-review-stale">Stale Reviews: 0</span>
+        <span class="metric-pill" id="metric-fail">Failing: 0</span>
+        <span class="metric-pill hidden" id="metric-invalid">Invalid: 0</span>
+      </div>
+
+      <!-- Work Tech-Tree Summary Metrics -->
+      <div class="summary-metrics hidden" id="work-metrics">
+        <span class="metric-pill" id="wmetric-done">
+          <span id="wmetric-done-text">0/0 Done</span>
+          <span class="progress-bar-track"><span id="wmetric-done-fill" class="progress-bar-fill"></span></span>
+        </span>
+        <span class="metric-pill" id="wmetric-ready">Ready: 0</span>
+        <span class="metric-pill" id="wmetric-active">Active: 0</span>
+        <span class="metric-pill" id="wmetric-blocked">Blocked: 0</span>
+        <span class="metric-pill" id="wmetric-cp">Critical Path: 0 pts</span>
+      </div>
+
+      <div class="toolbar-controls">
+        <!-- Pipeline-only controls -->
+        <button type="button" id="btn-toggle-mockery" class="btn active-toggle" aria-pressed="true">Show Mockery (6b)</button>
+        <button type="button" id="btn-toggle-blast" class="btn" aria-pressed="false">Highlight Stale Blast Radius</button>
+
+        <!-- Work-only controls -->
+        <button type="button" id="btn-toggle-cp" class="btn hidden" aria-pressed="false">Highlight Critical Path</button>
+        <button type="button" id="btn-work-refresh" class="btn hidden">Refresh</button>
+
+        <button type="button" id="btn-theme" class="btn" title="Toggle light/dark theme">Theme</button>
+        <span id="sse-pill" class="sse-pill" data-state="reconnecting" role="status" aria-live="polite">
+          <span class="sse-dot"></span>
+          <span id="sse-label">Connecting…</span>
+        </span>
+      </div>
+    </header>
+
+    <!-- Work Tech-Tree Filter Bar -->
+    <div id="work-subbar" class="work-subbar hidden" aria-label="Work Tech-Tree Filters">
+      <div class="work-filters-left">
+        <label for="scope-select" class="inspector-sub">Scope:</label>
+        <select id="scope-select" class="scope-select" aria-label="Filter by Project or Milestone">
+          <option value="all">All Active Projects</option>
+        </select>
+
+        <button type="button" class="filter-pill active" data-wfilter="all" aria-pressed="true">All</button>
+        <button type="button" class="filter-pill" data-wfilter="ready" aria-pressed="false">Ready to Start</button>
+        <button type="button" class="filter-pill" data-wfilter="active" aria-pressed="false">In Progress</button>
+        <button type="button" class="filter-pill" data-wfilter="blocked" aria-pressed="false">Blocked</button>
+        <button type="button" id="btn-hide-done" class="filter-pill" aria-pressed="false">Hide Done</button>
+      </div>
+      <div class="work-filters-right">
+        <span id="work-scope-points" class="inspector-sub"></span>
+      </div>
+    </div>
+
+    <main class="workspace">
+      <section class="canvas-pane" aria-label="Interactive Tech-Tree DAG">
+        <div id="canvas-scroller" class="canvas-scroller">
+          <div id="dag-stage" class="dag-stage">
+            <svg id="dag-edges" class="dag-edges-svg" aria-hidden="true"></svg>
+            <div id="dag-nodes"></div>
+          </div>
+          <div id="work-empty-host"></div>
+        </div>
+        <div class="canvas-footer">
+          <div class="legend-items" id="legend-items"></div>
+          <div class="zoom-controls">
+            <button type="button" id="btn-zoom-out" class="btn" aria-label="Zoom out">-</button>
+            <button type="button" id="btn-zoom-fit" class="btn">Fit</button>
+            <button type="button" id="btn-zoom-reset" class="btn">100%</button>
+            <button type="button" id="btn-zoom-in" class="btn" aria-label="Zoom in">+</button>
+          </div>
+        </div>
+      </section>
+
+      <aside class="inspector" aria-label="Inspector Drawer">
+        <div class="inspector-header" id="inspector-header"></div>
+        <div class="tab-bar" id="pipeline-tab-bar" role="tablist">
+          <button type="button" class="tab-btn active" role="tab" data-tab="overview" aria-selected="true">Overview / &lt;system_state&gt;</button>
+          <button type="button" class="tab-btn" role="tab" data-tab="narrative" aria-selected="false">Narrative</button>
+          <button type="button" class="tab-btn" role="tab" data-tab="reviews" aria-selected="false" id="tab-btn-reviews">Reviews</button>
+        </div>
+        <div id="inspector-body" class="inspector-body"></div>
+      </aside>
+    </main>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script type="module" src="/ui/app.js"></script>
+</body>
+</html>

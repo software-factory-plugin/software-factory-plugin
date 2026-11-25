@@ -4,7 +4,7 @@ import path from "node:path";
 import {
   analyzeWorkspace,
   extractSystemState,
-  REQUIRED_KEYS,
+  validateSystemState,
 } from "../../skills/sf-tree/scripts/analyzer.mjs";
 import { checkProject } from "../../skills/sf-mockery/scripts/check.mjs";
 import { exportProject } from "../../skills/sf-mockery/scripts/export.mjs";
@@ -57,21 +57,20 @@ export function runGoldenSchemasEval(repoRoot) {
       fs.utimesSync(full, t, t);
     });
 
-    // 1. Validate 80/20 structure and exact <system_state> schema per golden file
+    // 1. Validate 80/20 structure and strict nested <system_state> schema per golden file
     for (const rel of orderedFiles.filter((f) => f.endsWith(".md"))) {
       const content = fs.readFileSync(path.join(factoryDir, rel), "utf8");
-      const { narrative, state: parsed } = extractSystemState(content);
+      const { narrative, state: parsed, error: extractError } = extractSystemState(content);
       const hasNarrative = narrative.trim().length >= 60;
-      const expectedKeys = parsed?.phase ? REQUIRED_KEYS[parsed.phase] : null;
-      const missingKeys = expectedKeys
-        ? expectedKeys.filter((k) => !(k in parsed))
-        : ["phase"];
+      const validation = parsed?.phase
+        ? validateSystemState(parsed, parsed.phase)
+        : { valid: false, errors: [extractError || "Missing phase"] };
       add(
         `golden-schema:${rel}`,
-        Boolean(parsed && hasNarrative && expectedKeys && missingKeys.length === 0),
-        parsed && missingKeys.length === 0
-          ? `phase="${parsed.phase}" valid JSON + narrative (${narrative.trim().length} chars)`
-          : `Schema failure (missing: ${missingKeys.join(", ")})`
+        Boolean(parsed && hasNarrative && validation.valid),
+        parsed && validation.valid && hasNarrative
+          ? `phase="${parsed.phase}" strict schema valid + narrative (${narrative.trim().length} chars)`
+          : `Schema failure (${!hasNarrative ? "short narrative; " : ""}${validation.errors.join("; ")})`
       );
     }
 
@@ -203,6 +202,36 @@ export function runGoldenSchemasEval(repoRoot) {
       "negative:review-fail-detected",
       failGraph.summary.failing_review_phases.includes("specs"),
       `failing_review_phases=${JSON.stringify(failGraph.summary.failing_review_phases)}`
+    );
+
+    // 6. Negative case D: strict nested schema & invariant violations are rejected
+    const badMarket = validateSystemState(
+      {
+        phase: "market-research",
+        top_competitors: ["plain-string-not-object"],
+        identified_market_gaps: ["gap"],
+        recommended_pricing_model: "freemium",
+        macro_risks: ["risk"],
+        verdict: "Validated",
+      },
+      "market-research"
+    );
+    const badMockery = validateSystemState(
+      {
+        phase: "mockery",
+        fidelity: "wireframe",
+        mockups_dir: "docs/factory/mockups",
+        screens: [{ id: "home", title: "Home", device: "desktop", file: "screens/home.html" }],
+        edge_count: 0,
+        tokens_synced_from_ui: true,
+        open_design_questions: [],
+      },
+      "mockery"
+    );
+    add(
+      "negative:strict-schema-type-error",
+      !badMarket.valid && !badMockery.valid,
+      `market_errors=${badMarket.errors.length}, mockery_errors=${badMockery.errors.length}`
     );
   } finally {
     fs.rmSync(tmpRoot, { recursive: true, force: true });

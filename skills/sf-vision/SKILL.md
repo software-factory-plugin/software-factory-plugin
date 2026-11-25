@@ -12,10 +12,10 @@ Define the unshakeable foundation of a new software project. Extract the core th
 
 ## Inputs & Handoff Gate
 
-- **Required Inputs:** User's initial project idea/brainstorm and any explicit technical or business constraints. Interrogate briefly on **Why** and **Who** only if critically ambiguous.
-- **Missing-Input Guard:** If the initial idea is missing, or if any required upstream `<system_state>` block is missing or contains invalid JSON, STOP and ask the user to provide it (or offer to run the upstream skill first) — never guess or invent upstream requirements.
-- **Strict Constraint Inheritance:** Adhere strictly to any upstream `hard_constraints` and `explicitly_out_of_scope` items (plus `compliance_requirements` and `budget_or_timeline_constraints` when present).
-- **Stage Boundaries & Gates:** Establish the unshakeable project foundation and discard cruft. Define explicit non-negotiables (`hard_constraints`) and `explicitly_out_of_scope` items so downstream stages cannot boil the ocean.
+- **Required Inputs:** User's initial project idea/brainstorm and any explicit technical, compliance, budget, or timeline constraints supplied by the user.
+- **Missing-Input Guard:** If the initial project idea is missing or empty, **STOP** and ask the user to describe the project concept—never invent a project idea out of thin air. *(Stage 1 has no upstream `<system_state>` dependency.)*
+- **Constraint Capture & Boundaries:** Establish the unshakeable project foundation and discard cruft. Capture any user-provided technical, privacy, compliance, budget, or timeline non-negotiables in `hard_constraints`, and lock explicit exclusions in `explicitly_out_of_scope` so downstream stages cannot boil the ocean.
+- **Clarification Policy:** Do **not** interrogate the user when the prompt already provides high-signal answers for the thesis, `primary_user`, `ux_tone`, `hard_constraints`, and `explicitly_out_of_scope`. Ask focused clarifying questions (2–4 targeted questions via the Prompt Quality Gate below) **only** when those core fields are missing or critically ambiguous.
 - **Prompt Quality Gate (Context-Aware):** Evaluate the prompt before drafting (exempt targeted revisions of an existing `01-vision.md` or explicit `sf-review` fixes):
   - *High-Signal Signals:* Core problem/concept, `primary_user`, `ux_tone`, at least one `hard_constraints` boundary, and at least one `explicitly_out_of_scope` exclusion.
   - *Anti-Patterns:* Vague one-liners (e.g., *"Build me a status page app"*) or **multi-stage bundling** (asking to run multiple pipeline stages at once—non-overridable; pause and offer to run `sf-vision` alone first).
@@ -24,9 +24,9 @@ Define the unshakeable foundation of a new software project. Extract the core th
 
 ## Execution Steps
 
-1. **Validate Inputs & Constraints:** Confirm the project idea and any supplied upstream constraints; ask concise clarifying questions on **Why** and **Who** only when critically ambiguous.
+1. **Validate Idea & Run Gate:** Confirm the initial project idea is present (stopping if missing). Apply the Prompt Quality Gate above; ask targeted clarifying questions only for missing core fields, or proceed directly when the prompt is already high-signal.
 2. **Distill Thesis & Vibe:** Synthesize what the product is, why it exists, who the `primary_user` is, and the exact `ux_tone` (e.g., clinical, playful, hyper-dense).
-3. **Lock Boundaries:** Separate mandatory `hard_constraints` from `explicitly_out_of_scope` items so scope stays tightly bounded.
+3. **Lock Boundaries:** Separate mandatory `hard_constraints` from `explicitly_out_of_scope` items so downstream scope stays tightly bounded.
 4. **Draft 80/20 Hybrid Artifact:** Produce the narrative charter sections followed by the strict `<system_state>` JSON block, ensuring full parity between narrative and state.
 
 ## Output Format (80/20 Hybrid Artifact)
@@ -59,4 +59,4 @@ Place strict, valid JSON directly inside `<system_state>...</system_state>` (no 
 
 - **Self-Checks:** Verify `<system_state>` contains strict, valid JSON matching the exact schema above; confirm 1:1 parity between the narrative sections and JSON fields; confirm zero out-of-scope or constraint leakage.
 - **Persistence:** When working in a workspace/repository, write the generated artifact to `docs/factory/01-vision.md` (creating `docs/factory/` if needed) in addition to returning it in chat; otherwise recommend saving it to `docs/factory/01-vision.md`.
-- **Handoff Gate:** Pause for human review and suggest running `sf-review` against upstream artifact(s) before advancing to `sf-market-research` (never auto-advance).
+- **Handoff Gate:** Pause for human review and stakeholder sign-off before advancing to `sf-market-research` (never auto-advance). Stage 1 has no upstream artifact, so do not run `sf-review` on `01-vision.md` alone (`sf-review` audits Stage 2+ targets against upstream sources).

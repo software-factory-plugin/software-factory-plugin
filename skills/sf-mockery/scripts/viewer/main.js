@@ -17,9 +17,19 @@ function safeSetTheme(next) {
 
 function safeReplaceHash(hash) {
   try {
-    if (hash) history.replaceState(null, '', `#${hash}`);
+    if (hash) history.replaceState(null, '', `#${encodeURIComponent(hash)}`);
     else history.replaceState(null, '', location.pathname + location.search);
   } catch { /* ignore file:// restrictions */ }
+}
+
+function safeDecodeHash() {
+  const raw = location.hash.slice(1);
+  if (!raw) return '';
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
 }
 
 document.documentElement.dataset.theme = safeGetTheme();
@@ -60,6 +70,7 @@ async function loadFlow() {
       return;
     }
     const res = await fetch('/flow.json', { cache: 'no-store' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     renderer.setFlow(await res.json());
     toast('');
   } catch (err) {
@@ -70,6 +81,7 @@ async function loadFlow() {
 // ---- hot reload -------------------------------------------------------------
 
 async function onFileChange(path) {
+  const matchesActiveScreen = [...renderer.frames.values()].some((f) => f.node?.file === path);
   if (isSharedStyle(path)) {
     await loadSharedStyles();      // swaps the adopted sheet in place: no screen re-fetch
     renderer.remeasure();          // tokens can move buttons, so re-anchor arrows
@@ -78,9 +90,12 @@ async function onFileChange(path) {
   } else if (/^components\/.+\.html$/.test(path)) {
     const name = invalidate(path);
     renderer.rerender((f) => f.deps.has(name));
-  } else if (/^screens\/.+\.html$/.test(path)) {
+  } else if (matchesActiveScreen || /^screens\/.+\.html$/.test(path)) {
     invalidate(path);
     renderer.rerender((f) => f.node.file === path);
+  } else if (path.startsWith('assets/')) {
+    location.reload();             // cache-bust updated local assets; camera is restored from storage
+    return;
   } else if (path.startsWith('__mockery/') || path === 'fonts.css') {
     location.reload();             // viewer code or document-level fonts changed; camera is restored from storage
     return;
@@ -103,14 +118,44 @@ if (isStaticBundle) {
 } else {
   const events = new EventSource('/__events');
   let wasDown = false;
-  events.onmessage = (ev) => onFileChange(JSON.parse(ev.data).path);
-  events.onopen = () => { $('status').className = 'is-live'; if (wasDown) refreshAll(); wasDown = false; };
+  events.onmessage = (ev) => {
+    try {
+      const msg = JSON.parse(ev.data);
+      if (msg && typeof msg.path === 'string') {
+        Promise.resolve(onFileChange(msg.path)).catch((err) => {
+          toast(`Hot reload failed: ${err?.message || String(err)}`);
+        });
+      }
+    } catch (err) {
+      toast(`Hot reload event error: ${err?.message || String(err)}`);
+    }
+  };
+  events.onopen = () => {
+    $('status').className = 'is-live';
+    if (wasDown) {
+      refreshAll().catch((err) => toast(`Refresh failed: ${err?.message || String(err)}`));
+    }
+    wasDown = false;
+  };
   events.onerror = () => { $('status').className = 'is-down'; wasDown = true; };
 }
 
 // ---- keyboard -----------------------------------------------------------------
 
 addEventListener('keydown', (e) => {
+  const target = e.composedPath?.()[0] || e.target;
+  if (target && target.nodeType === 1) {
+    const tag = target.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable) {
+      return;
+    }
+    if (target.classList?.contains('frame') && (e.key === 'Enter' || e.key === ' ')) {
+      e.preventDefault();
+      if (target.dataset?.id) focus(target.dataset.id);
+      return;
+    }
+  }
+
   const actions = {
     '0': () => fitAll(),
     '1': () => camera.zoomTo(1),
@@ -137,7 +182,7 @@ addEventListener('keydown', (e) => {
   action();
 });
 
-addEventListener('hashchange', () => focus(decodeURIComponent(location.hash.slice(1))));
+addEventListener('hashchange', () => focus(safeDecodeHash()));
 
 // ---- HUD ------------------------------------------------------------------------
 
@@ -154,7 +199,7 @@ const toast = (text) => { $('toast').textContent = text; };
 // ---- boot -----------------------------------------------------------------------
 
 await Promise.all([loadSharedStyles(), loadFlow()]);
-const hashId = decodeURIComponent(location.hash.slice(1));
+const hashId = safeDecodeHash();
 const isReload = performance.getEntriesByType('navigation')[0]?.type === 'reload';
 if (hashId && renderer.focusRect(hashId) && !isReload) focus(hashId, false);
 else if (!camera.restore()) fitAll(false);

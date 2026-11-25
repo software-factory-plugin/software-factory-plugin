@@ -1,5 +1,22 @@
 import fs from "node:fs";
 import path from "node:path";
+import {
+  extractSystemState,
+  REQUIRED_KEYS,
+} from "../../skills/sf-tree/scripts/analyzer.mjs";
+
+const SKILL_TO_PHASE = {
+  "sf-vision": "vision",
+  "sf-market-research": "market-research",
+  "sf-brd": "brd",
+  "sf-prd": "prd",
+  "sf-ux": "ux",
+  "sf-ui": "ui",
+  "sf-mockery": "mockery",
+  "sf-architecture": "architecture",
+  "sf-specs": "specs",
+  "sf-review": "review",
+};
 
 const DOWNSTREAM_PIPELINE_SKILLS = [
   "sf-market-research",
@@ -26,7 +43,8 @@ const ALL_SKILLS = [
 
 /**
  * Audit Missing-Input Guard contracts, Input Resolution Order, human-in-the-loop
- * non-auto-advance gates, and sf-review Red Team audit vector completeness.
+ * non-auto-advance gates, parsed <system_state> key parity against REQUIRED_KEYS,
+ * and sf-review Red Team audit vector completeness.
  */
 export function runGuardsReviewEval(repoRoot) {
   const checks = [];
@@ -38,12 +56,32 @@ export function runGuardsReviewEval(repoRoot) {
       "utf8"
     );
 
-    const hasSystemState = /<system_state>[\s\S]*?<\/system_state>/i.test(content);
-    add(
-      `contract-system-state:${skill}`,
-      hasSystemState,
-      hasSystemState ? "Includes <system_state> JSON template" : "Missing <system_state> template"
-    );
+    const expectedPhase = SKILL_TO_PHASE[skill];
+    const expectedKeys = REQUIRED_KEYS[expectedPhase] || [];
+    const extracted = extractSystemState(content);
+    const parsed = extracted.state;
+    const isValidObject = Boolean(parsed && typeof parsed === "object" && !Array.isArray(parsed) && !extracted.error);
+    const actualKeys = isValidObject ? Object.keys(parsed) : [];
+    const missingKeys = expectedKeys.filter((k) => !actualKeys.includes(k));
+    const extraKeys = actualKeys.filter((k) => !expectedKeys.includes(k));
+    const phaseMatches = isValidObject && parsed.phase === expectedPhase;
+    const stateOk = isValidObject && phaseMatches && missingKeys.length === 0 && extraKeys.length === 0;
+
+    let stateDetail;
+    if (stateOk) {
+      stateDetail = `Parsed <system_state> JSON (phase="${parsed.phase}", ${actualKeys.length}/${expectedKeys.length} exact REQUIRED_KEYS)`;
+    } else if (!isValidObject) {
+      stateDetail = `Invalid or missing <system_state> JSON (${extracted.error || "not an object"})`;
+    } else if (!phaseMatches) {
+      stateDetail = `Expected phase="${expectedPhase}", got "${String(parsed.phase)}"`;
+    } else {
+      const parts = [];
+      if (missingKeys.length) parts.push(`missing: ${missingKeys.join(", ")}`);
+      if (extraKeys.length) parts.push(`extra: ${extraKeys.join(", ")}`);
+      stateDetail = `<system_state> key drift vs REQUIRED_KEYS (${parts.join("; ")})`;
+    }
+
+    add(`contract-system-state:${skill}`, stateOk, stateDetail);
 
     const hasNoAutoAdvance = /never auto-advance|pause for human review|wait for the user/i.test(
       content

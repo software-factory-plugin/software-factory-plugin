@@ -26,13 +26,32 @@ export function runTokenEfficiencyEval(repoRoot) {
   const metrics = [];
   let totalIdleTokens = 0;
   let totalBodyTokens = 0;
+  let invalidFrontmatterCount = 0;
 
   for (const name of skillNames) {
     const file = path.join(skillsDir, name, "SKILL.md");
-    if (!fs.existsSync(file)) continue;
+    if (!fs.existsSync(file)) {
+      invalidFrontmatterCount += 1;
+      checks.push({
+        id: `frontmatter-valid:${name}`,
+        passed: false,
+        detail: "Missing SKILL.md",
+      });
+      continue;
+    }
     const raw = fs.readFileSync(file, "utf8");
     const fm = parseFrontmatter(raw);
-    const idleText = fm ? `${fm.name}: ${fm.description}` : "";
+    const fmValid = Boolean(fm && fm.name && fm.description);
+    if (!fmValid) {
+      invalidFrontmatterCount += 1;
+      checks.push({
+        id: `frontmatter-valid:${name}`,
+        passed: false,
+        detail: "Missing or unparseable YAML frontmatter (name/description required)",
+      });
+      continue;
+    }
+    const idleText = `${fm.name}: ${fm.description}`;
     const idleTokens = estimateTokens(idleText);
     const bodyTokens = estimateTokens(raw);
 
@@ -56,8 +75,16 @@ export function runTokenEfficiencyEval(repoRoot) {
 
   checks.push({
     id: "idle-router-budget:total",
-    passed: totalIdleTokens <= MAX_IDLE_TOKENS_TOTAL,
-    detail: `~${totalIdleTokens} est idle router tokens across ${metrics.length} skills (limit <= ${MAX_IDLE_TOKENS_TOTAL})`,
+    passed:
+      metrics.length > 0 &&
+      invalidFrontmatterCount === 0 &&
+      totalIdleTokens <= MAX_IDLE_TOKENS_TOTAL,
+    detail:
+      invalidFrontmatterCount > 0
+        ? `${invalidFrontmatterCount} skill(s) have missing/unparseable frontmatter`
+        : metrics.length === 0
+          ? "No valid skills found under skills/"
+          : `~${totalIdleTokens} est idle router tokens across ${metrics.length} skills (limit <= ${MAX_IDLE_TOKENS_TOTAL})`,
   });
 
   return {

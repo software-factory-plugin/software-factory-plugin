@@ -7,8 +7,55 @@ import {
 } from "./work-analyzer.mjs";
 
 export const LINEAR_GRAPHQL_ENDPOINT = "https://api.linear.app/graphql";
+export const DEFAULT_TIMEOUT_MS = 15000;
+export const DEFAULT_MAX_RETRIES = 3;
+export const DEFAULT_BASE_BACKOFF_MS = 500;
+const MAX_BACKOFF_MS = 60000;
 const MAX_GRAPHQL_PAGES = 20;
 const DEFAULT_PAGE_SIZE = 100;
+const RETRYABLE_HTTP_STATUSES = new Set([429, 502, 503, 504]);
+
+const defaultSleep = (ms) =>
+  new Promise((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    if (typeof timer.unref === "function") timer.unref();
+  });
+
+/**
+ * Parse an HTTP `Retry-After` header (delta-seconds or HTTP-date) into delay milliseconds.
+ * Returns null if missing or unparseable.
+ */
+export function parseRetryAfterMs(headerValue, nowMs = Date.now()) {
+  if (headerValue === null || headerValue === undefined) return null;
+  const trimmed = String(headerValue).trim();
+  if (!trimmed) return null;
+
+  if (/^\d+(?:\.\d+)?$/.test(trimmed)) {
+    const secs = Number(trimmed);
+    if (Number.isFinite(secs) && secs >= 0) {
+      return Math.min(MAX_BACKOFF_MS, Math.round(secs * 1000));
+    }
+  }
+
+  const dateMs = Date.parse(trimmed);
+  if (Number.isFinite(dateMs)) {
+    return Math.min(MAX_BACKOFF_MS, Math.max(0, dateMs - nowMs));
+  }
+
+  return null;
+}
+
+function readHeader(headers, name) {
+  if (!headers) return null;
+  if (typeof headers.get === "function") {
+    return headers.get(name);
+  }
+  const target = name.toLowerCase();
+  for (const [k, v] of Object.entries(headers)) {
+    if (k.toLowerCase() === target) return v;
+  }
+  return null;
+}
 
 function extractPrAttachments(attachments) {
   const list = Array.isArray(attachments)
@@ -320,30 +367,100 @@ function redactSecret(message, secret) {
   return text.split(secret).join("[REDACTED]");
 }
 
-async function runLinearGraphQL({ query, variables, apiKey, endpoint, fetchImpl }) {
-  let resp;
-  try {
-    resp = await fetchImpl(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: apiKey,
-      },
-      body: JSON.stringify({ query, variables }),
-    });
-  } catch (err) {
-    throw new Error(
-      `Failed to connect to Linear GraphQL API: ${redactSecret(err.message, apiKey)}`
-    );
+async function runLinearGraphQL({
+  query,
+  variables,
+  apiKey,
+  endpoint,
+  fetchImpl,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+  maxRetries = DEFAULT_MAX_RETRIES,
+  baseBackoffMs = DEFAULT_BASE_BACKOFF_MS,
+  sleepImpl = defaultSleep,
+}) {
+  const effectiveRetries =
+    typeof maxRetries === "number" && Number.isInteger(maxRetries) && maxRetries >= 0
+      ? maxRetries
+      : DEFAULT_MAX_RETRIES;
+  const effectiveTimeoutMs =
+    typeof timeoutMs === "number" && Number.isFinite(timeoutMs) && timeoutMs > 0
+      ? timeoutMs
+      : DEFAULT_TIMEOUT_MS;
+  const effectiveBaseBackoff =
+    typeof baseBackoffMs === "number" && Number.isFinite(baseBackoffMs) && baseBackoffMs >= 0
+      ? baseBackoffMs
+      : DEFAULT_BASE_BACKOFF_MS;
+
+  let resp = null;
+  for (let attempt = 0; attempt <= effectiveRetries; attempt += 1) {
+    const signal = AbortSignal.timeout(effectiveTimeoutMs);
+    let guardTimer = null;
+    try {
+      const fetchPromise = Promise.resolve().then(() =>
+        fetchImpl(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: apiKey,
+          },
+          body: JSON.stringify({ query, variables }),
+          signal,
+        })
+      );
+      fetchPromise.catch(() => {});
+      const timeoutPromise = new Promise((_resolve, reject) => {
+        guardTimer = setTimeout(() => {
+          const timeoutErr = new Error(
+            `Linear GraphQL API request timed out after ${effectiveTimeoutMs}ms`
+          );
+          timeoutErr.name = "TimeoutError";
+          reject(timeoutErr);
+        }, effectiveTimeoutMs);
+      });
+      resp = await Promise.race([fetchPromise, timeoutPromise]);
+    } catch (err) {
+      if (err && (err.name === "TimeoutError" || err.name === "AbortError")) {
+        throw new Error(
+          `Linear GraphQL API request timed out after ${effectiveTimeoutMs}ms`
+        );
+      }
+      throw new Error(
+        `Failed to connect to Linear GraphQL API: ${redactSecret(err?.message, apiKey)}`
+      );
+    } finally {
+      if (guardTimer) {
+        clearTimeout(guardTimer);
+        guardTimer = null;
+      }
+    }
+
+    if (resp.status === 401 || resp.status === 403) {
+      throw new Error(
+        `Linear API authentication failed (HTTP ${resp.status}). Verify LINEAR_API_KEY is valid.`
+      );
+    }
+
+    if (RETRYABLE_HTTP_STATUSES.has(resp.status) && attempt < effectiveRetries) {
+      let delayMs = Math.min(
+        MAX_BACKOFF_MS,
+        Math.round(effectiveBaseBackoff * Math.pow(2, attempt))
+      );
+      if (resp.status === 429) {
+        const retryAfterRaw = readHeader(resp.headers, "retry-after");
+        const parsedRetryAfter = parseRetryAfterMs(retryAfterRaw);
+        if (parsedRetryAfter !== null) {
+          delayMs = parsedRetryAfter;
+        }
+      }
+      await sleepImpl(delayMs);
+      continue;
+    }
+
+    break;
   }
 
-  if (resp.status === 401 || resp.status === 403) {
-    throw new Error(
-      `Linear API authentication failed (HTTP ${resp.status}). Verify LINEAR_API_KEY is valid.`
-    );
-  }
-  if (!resp.ok) {
-    throw new Error(`Linear GraphQL API returned HTTP ${resp.status}`);
+  if (!resp || !resp.ok) {
+    throw new Error(`Linear GraphQL API returned HTTP ${resp ? resp.status : "unknown"}`);
   }
 
   let body;
@@ -370,6 +487,9 @@ const METADATA_QUERY = `
       urlKey
     }
     teams(first: 50) {
+      pageInfo {
+        hasNextPage
+      }
       nodes {
         id
         key
@@ -377,6 +497,9 @@ const METADATA_QUERY = `
       }
     }
     projects(first: 100, includeArchived: false) {
+      pageInfo {
+        hasNextPage
+      }
       nodes {
         id
         slugId
@@ -392,6 +515,9 @@ const METADATA_QUERY = `
           }
         }
         projectMilestones(first: 50) {
+          pageInfo {
+            hasNextPage
+          }
           nodes {
             id
             name
@@ -447,6 +573,9 @@ const ISSUES_PAGE_QUERY = `
           }
         }
         relations(first: 50) {
+          pageInfo {
+            hasNextPage
+          }
           nodes {
             type
             relatedIssue {
@@ -455,6 +584,9 @@ const ISSUES_PAGE_QUERY = `
           }
         }
         inverseRelations(first: 50) {
+          pageInfo {
+            hasNextPage
+          }
           nodes {
             type
             issue {
@@ -482,6 +614,11 @@ export async function fetchLinearGraph({
   apiKey = process.env.LINEAR_API_KEY,
   endpoint = LINEAR_GRAPHQL_ENDPOINT,
   fetchImpl = globalThis.fetch,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+  maxRetries = DEFAULT_MAX_RETRIES,
+  baseBackoffMs = DEFAULT_BASE_BACKOFF_MS,
+  sleepImpl = defaultSleep,
+  maxPages = MAX_GRAPHQL_PAGES,
 } = {}) {
   if (!project && !team) {
     throw new Error(
@@ -498,13 +635,33 @@ export async function fetchLinearGraph({
   }
 
   const cleanKey = apiKey.trim();
-  const meta = await runLinearGraphQL({
-    query: METADATA_QUERY,
-    variables: {},
+  const reqOpts = {
     apiKey: cleanKey,
     endpoint,
     fetchImpl,
+    timeoutMs,
+    maxRetries,
+    baseBackoffMs,
+    sleepImpl,
+  };
+
+  const meta = await runLinearGraphQL({
+    query: METADATA_QUERY,
+    variables: {},
+    ...reqOpts,
   });
+
+  const truncationWarnings = [];
+  if (meta?.teams?.pageInfo?.hasNextPage === true) {
+    truncationWarnings.push(
+      "Linear teams metadata was truncated at 50 entries (hasNextPage=true)."
+    );
+  }
+  if (meta?.projects?.pageInfo?.hasNextPage === true) {
+    truncationWarnings.push(
+      "Linear projects metadata was truncated at 100 entries (hasNextPage=true)."
+    );
+  }
 
   const orgName =
     meta?.organization?.urlKey || meta?.organization?.name || "linear";
@@ -540,21 +697,36 @@ export async function fetchLinearGraph({
           matchInsensitive(p.id, project) ||
           matchInsensitive(p.slugId, project) ||
           matchInsensitive(p.name, project)
-      ) ||
-      allProjects.find(
-        (p) =>
-          matchInsensitive(p.id, project) ||
-          matchInsensitive(p.slugId, project) ||
-          matchInsensitive(p.name, project)
-      ) ||
-      null;
+      ) || null;
 
     if (!matchedProject) {
+      if (matchedTeam) {
+        const otherTeamProject = allProjects.find(
+          (p) =>
+            matchInsensitive(p.id, project) ||
+            matchInsensitive(p.slugId, project) ||
+            matchInsensitive(p.name, project)
+        );
+        if (otherTeamProject) {
+          throw new Error(
+            `Conflicting Linear filters: project "${otherTeamProject.name || project}" does not belong to team "${matchedTeam.key || matchedTeam.name}"`
+          );
+        }
+      }
       throw new Error(`Linear project not found: "${project}"`);
     }
+
     selectedProjects = [matchedProject];
     if (!matchedTeam && matchedProject.teams?.nodes?.[0]) {
       matchedTeam = matchedProject.teams.nodes[0];
+    }
+  }
+
+  for (const p of selectedProjects) {
+    if (p?.projectMilestones?.pageInfo?.hasNextPage === true) {
+      truncationWarnings.push(
+        `Linear milestones for project "${p.name || p.id}" were truncated at 50 entries (hasNextPage=true).`
+      );
     }
   }
 
@@ -567,9 +739,15 @@ export async function fetchLinearGraph({
   }
 
   // Paginate issues
+  const pageLimit =
+    typeof maxPages === "number" && Number.isInteger(maxPages) && maxPages > 0
+      ? maxPages
+      : MAX_GRAPHQL_PAGES;
   const collectedIssues = [];
   let cursor = null;
-  for (let page = 0; page < MAX_GRAPHQL_PAGES; page += 1) {
+  let lastHasNextPage = false;
+
+  for (let page = 0; page < pageLimit; page += 1) {
     const data = await runLinearGraphQL({
       query: ISSUES_PAGE_QUERY,
       variables: {
@@ -577,20 +755,35 @@ export async function fetchLinearGraph({
         first: DEFAULT_PAGE_SIZE,
         after: cursor,
       },
-      apiKey: cleanKey,
-      endpoint,
-      fetchImpl,
+      ...reqOpts,
     });
     const conn = data?.issues;
     const nodes = Array.isArray(conn?.nodes) ? conn.nodes : [];
     collectedIssues.push(...nodes);
-    if (!conn?.pageInfo?.hasNextPage || !conn?.pageInfo?.endCursor) {
+    lastHasNextPage = Boolean(conn?.pageInfo?.hasNextPage);
+    if (!lastHasNextPage || !conn?.pageInfo?.endCursor) {
       break;
     }
     cursor = conn.pageInfo.endCursor;
   }
 
-  return normalizeLinearMcpPayload(
+  if (lastHasNextPage) {
+    truncationWarnings.push(
+      `Linear issues pagination reached the ${pageLimit}-page cap (${collectedIssues.length} issues fetched); graph is truncated and dependencies/Critical Path may be incomplete.`
+    );
+  }
+
+  for (const iss of collectedIssues) {
+    const relTrunc = iss?.relations?.pageInfo?.hasNextPage === true;
+    const invTrunc = iss?.inverseRelations?.pageInfo?.hasNextPage === true;
+    if (relTrunc || invTrunc) {
+      truncationWarnings.push(
+        `Linear dependency relations for issue ${iss.identifier || iss.id || "unknown"} were truncated at 50 entries; blockers/unlocks may be incomplete.`
+      );
+    }
+  }
+
+  const graph = normalizeLinearMcpPayload(
     {
       projects: selectedProjects,
       issues: collectedIssues,
@@ -603,4 +796,26 @@ export async function fetchLinearGraph({
       refreshedAt: new Date().toISOString(),
     }
   );
+
+  const truncated = truncationWarnings.length > 0;
+  graph.truncated = truncated;
+  if (graph.source) {
+    graph.source.truncated = truncated;
+  }
+  if (graph.summary) {
+    graph.summary.truncated = truncated;
+  }
+  if (truncationWarnings.length > 0) {
+    const existingWarnings = Array.isArray(graph.warnings) ? graph.warnings : [];
+    const mergedWarnings = [...existingWarnings];
+    for (const w of truncationWarnings) {
+      if (!mergedWarnings.includes(w)) mergedWarnings.push(w);
+    }
+    graph.warnings = mergedWarnings;
+    if (graph.summary) {
+      graph.summary.warnings = [...mergedWarnings];
+    }
+  }
+
+  return graph;
 }

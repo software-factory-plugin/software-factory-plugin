@@ -4,11 +4,42 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  isAllowedLocalHost,
+  safeDecodeRequestPath,
+  buildSecurityHeaders,
+  sendText,
+  sendHtml,
+  createSseHub,
+  listenWithFallback,
+  installGracefulShutdown,
+} from '../../../lib/http-sse.mjs';
+import {
+  resolveContainedPath,
+  createDebouncedWatcher,
+} from '../../../lib/fs-safe.mjs';
+import {
+  escHtml,
+  hashShort,
+  toPosixPath,
+} from '../../../lib/cli-utils.mjs';
 
 const SCRIPTS_ROOT = path.dirname(fileURLToPath(import.meta.url));
 const VIEWER_DIR = path.join(SCRIPTS_ROOT, 'viewer');
 const VIEWER_PREFIX = '/__mockery/'; // viewer files live under this prefix so projects can use any path
 const IGNORE = /(^|\/)(\.|node_modules(\/|$))/; // dotfiles, .git, node_modules
+const VIEWER_CSP = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data:",
+  "font-src 'self' data:",
+  "connect-src 'self'",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "form-action 'none'",
+  "frame-ancestors 'none'",
+].join('; ');
 
 export const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -29,46 +60,61 @@ export const MIME_TYPES = {
   '.otf': 'font/otf',
 };
 
-const escAttr = (s) => String(s).replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
-const toPosix = (p) => p.split(path.sep).join('/');
-
-function sendFile(res, base, rel, fallback) {
-  const absBase = path.resolve(base);
+function sendFile(res, base, rel, { method = 'GET', fallback } = {}) {
   const cleanRel = String(rel || '').replace(/^\/+/, '');
-  const file = path.resolve(absBase, cleanRel);
-  if (!file.startsWith(absBase + path.sep) || IGNORE.test(toPosix(path.relative(absBase, file)))) {
-    res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' }).end('Forbidden');
+  const posixRel = toPosixPath(cleanRel);
+  if (!cleanRel || IGNORE.test(posixRel)) {
+    sendText(res, 403, 'Forbidden', { method });
     return;
   }
-  fs.readFile(file, (err, data) => {
-    if (err && fallback !== undefined) data = fallback;
-    else if (err) {
-      res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }).end(`Not found: ${cleanRel}`);
+
+  const resolved = resolveContainedPath(base, cleanRel, {
+    allowSymlinks: false,
+    requireFile: true,
+  });
+
+  if (!resolved.ok) {
+    if (
+      resolved.reason === 'path_escape' ||
+      resolved.reason === 'symlink_not_allowed' ||
+      resolved.reason === 'invalid_path'
+    ) {
+      sendText(res, 403, 'Forbidden', { method });
+      return;
+    }
+    if (resolved.reason === 'not_found' && fallback !== undefined) {
+      const buf = Buffer.isBuffer(fallback) ? fallback : Buffer.from(String(fallback), 'utf8');
+      res.writeHead(200, {
+        ...buildSecurityHeaders(),
+        'Content-Type': MIME_TYPES[path.extname(cleanRel).toLowerCase()] || 'application/octet-stream',
+        'Content-Length': buf.length,
+      });
+      if (method === 'HEAD') res.end();
+      else res.end(buf);
+      return;
+    }
+    sendText(res, 404, `Not found: ${cleanRel}`, { method });
+    return;
+  }
+
+  if (IGNORE.test(resolved.clean)) {
+    sendText(res, 403, 'Forbidden', { method });
+    return;
+  }
+
+  fs.readFile(resolved.realPath, (err, data) => {
+    if (err) {
+      sendText(res, 404, `Not found: ${cleanRel}`, { method });
       return;
     }
     res.writeHead(200, {
-      'Content-Type': MIME_TYPES[path.extname(file).toLowerCase()] || 'application/octet-stream',
-      'Cache-Control': 'no-store',
+      ...buildSecurityHeaders(),
+      'Content-Type': MIME_TYPES[path.extname(resolved.realPath).toLowerCase()] || 'application/octet-stream',
+      'Content-Length': data.length,
     });
-    res.end(data);
+    if (method === 'HEAD') res.end();
+    else res.end(data);
   });
-}
-
-// Recursive watch with a per-path debounce (editors often write a file in several steps).
-function watchDir(dir, onChange) {
-  const pending = new Map();
-  try {
-    return fs.watch(dir, { recursive: true }, (_event, name) => {
-      if (!name) return;
-      const rel = toPosix(String(name));
-      if (IGNORE.test(rel)) return;
-      clearTimeout(pending.get(rel));
-      pending.set(rel, setTimeout(() => { pending.delete(rel); onChange(rel); }, 40));
-    });
-  } catch (err) {
-    console.warn(`mockery: file watch unavailable for ${dir} (${err.message}); hot reload disabled`);
-    return null;
-  }
 }
 
 export function deriveProjectName(absRoot) {
@@ -85,88 +131,115 @@ export function deriveProjectName(absRoot) {
 }
 
 // Serve one project folder. `dev` also watches the bundled viewer files.
-export function serve({ root, port = 5180, strictPort = false, dev = false }) {
+export async function serve({ root, port = 5180, strictPort = false, dev = false, handleSignals = false }) {
   const absRoot = path.resolve(root);
-  const clients = new Set();
   const watchers = [];
   const name = deriveProjectName(absRoot);
+  const projectId = `project:${hashShort(absRoot, 16)}`;
+  const sse = createSseHub({ maxClients: 50, heartbeatMs: 30_000, retryMs: 500 });
+  let activePort = 0;
 
   const server = http.createServer((req, res) => {
-    const url = new URL(req.url, 'http://127.0.0.1');
-    const p = decodeURIComponent(url.pathname);
+    const method = req.method || 'GET';
+    const boundPort = activePort || (typeof server.address() === 'object' && server.address()?.port) || 0;
 
-    if (p === '/__events') {
-      res.writeHead(200, {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        Connection: 'keep-alive',
+    if (!isAllowedLocalHost(req.headers.host, boundPort)) {
+      sendText(res, 403, 'Forbidden', { method });
+      return;
+    }
+
+    if (method !== 'GET' && method !== 'HEAD') {
+      sendText(res, 405, 'Method Not Allowed', {
+        method,
+        headers: { Allow: 'GET, HEAD' },
       });
-      res.write('retry: 500\n\n');
-      clients.add(res);
-      req.on('close', () => clients.delete(res));
+      return;
+    }
+
+    const decoded = safeDecodeRequestPath(req.url);
+    if (!decoded.ok) {
+      sendText(res, decoded.status, 'Bad Request', { method });
+      return;
+    }
+
+    const p = decoded.pathname;
+    if (p === '/__events') {
+      sse.accept(req, res);
     } else if (p === '/' || p === '/index.html') {
       const html = fs.readFileSync(path.join(VIEWER_DIR, 'index.html'), 'utf8')
-        .replaceAll('{{project-name}}', escAttr(name))
-        .replaceAll('{{project-id}}', escAttr(absRoot));
-      res.writeHead(200, { 'Content-Type': MIME_TYPES['.html'], 'Cache-Control': 'no-store' }).end(html);
+        .replaceAll('{{project-name}}', () => escHtml(name))
+        .replaceAll('{{project-id}}', () => escHtml(projectId));
+      sendHtml(res, 200, html, { method, csp: VIEWER_CSP });
     } else if (p === `${VIEWER_PREFIX}fonts.css`) {
-      sendFile(res, absRoot, 'fonts.css', ''); // optional project file, loaded at document level
+      sendFile(res, absRoot, 'fonts.css', { method, fallback: '' }); // optional project file, loaded at document level
     } else if (p.startsWith(VIEWER_PREFIX)) {
-      sendFile(res, VIEWER_DIR, p.slice(VIEWER_PREFIX.length));
+      sendFile(res, VIEWER_DIR, p.slice(VIEWER_PREFIX.length), { method });
     } else {
-      sendFile(res, absRoot, p);
+      sendFile(res, absRoot, p, { method });
     }
   });
 
   const broadcast = (rel) => {
-    const msg = `data: ${JSON.stringify({ path: rel })}\n\n`;
-    for (const client of clients) client.write(msg);
+    sse.broadcastEvent('', { path: rel });
     console.log(`changed  ${rel}`);
   };
 
-  const rootWatcher = watchDir(absRoot, broadcast);
+  const rootWatcher = createDebouncedWatcher(absRoot, {
+    recursive: true,
+    debounceMs: 40,
+    filter: (rel) => Boolean(rel) && !IGNORE.test(rel),
+    onChange: broadcast,
+    onError: (err) => {
+      console.warn(`mockery: file watch unavailable for ${absRoot} (${err.message}); hot reload disabled`);
+    },
+  });
   if (rootWatcher) watchers.push(rootWatcher);
+
   if (dev) {
-    const viewerWatcher = watchDir(VIEWER_DIR, (rel) => broadcast(`__mockery/${rel}`));
+    const viewerWatcher = createDebouncedWatcher(VIEWER_DIR, {
+      recursive: true,
+      debounceMs: 40,
+      filter: (rel) => Boolean(rel) && !IGNORE.test(rel),
+      onChange: (rel) => broadcast(`__mockery/${rel}`),
+      onError: (err) => {
+        console.warn(`mockery: file watch unavailable for ${VIEWER_DIR} (${err.message}); hot reload disabled`);
+      },
+    });
     if (viewerWatcher) watchers.push(viewerWatcher);
   }
 
-  // Keep idle SSE connections alive through proxies and sleep.
-  const ping = setInterval(() => {
-    for (const client of clients) client.write(': ping\n\n');
-  }, 30_000);
-  ping.unref();
-
-  const close = () => new Promise((resolve) => {
-    clearInterval(ping);
+  let uninstallSignals = null;
+  let closed = false;
+  const close = () => {
+    if (closed) return Promise.resolve();
+    closed = true;
+    if (uninstallSignals) {
+      uninstallSignals();
+      uninstallSignals = null;
+    }
     for (const w of watchers) {
       try { w.close(); } catch { /* ignore */ }
     }
-    for (const client of clients) {
-      try { client.end(); } catch { /* ignore */ }
-    }
-    clients.clear();
-    server.close(() => resolve());
-  });
-
-  // Without an explicit port, step past ports already taken (e.g. another project's viewer).
-  return new Promise((resolve, reject) => {
-    let onError;
-    const attempt = (p, left) => {
-      onError = (err) => {
-        if (err.code === 'EADDRINUSE' && !strictPort && left > 0) attempt(p + 1, left - 1);
-        else {
-          close().finally(() => reject(err));
-        }
-      };
-      server.once('error', onError);
-      server.listen(p, '127.0.0.1');
-    };
-    server.once('listening', () => {
-      server.off('error', onError);
-      const { port: bound } = server.address();
-      resolve({ url: `http://127.0.0.1:${bound}`, port: bound, name, server, close });
+    watchers.length = 0;
+    sse.close();
+    return new Promise((resolve) => {
+      if (!server.listening) {
+        resolve();
+        return;
+      }
+      server.close(() => resolve());
     });
-    attempt(port, 20);
-  });
+  };
+
+  try {
+    const bound = await listenWithFallback(server, port, { strictPort, maxAttempts: 20 });
+    activePort = bound;
+    if (handleSignals) {
+      uninstallSignals = installGracefulShutdown(close);
+    }
+    return { url: `http://127.0.0.1:${bound}`, port: bound, name, server, close };
+  } catch (err) {
+    await close();
+    throw err;
+  }
 }

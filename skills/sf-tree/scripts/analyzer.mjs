@@ -1,15 +1,31 @@
 import fs from "node:fs";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { posixShellQuote } from "../../../lib/cli-utils.mjs";
+import {
+  isPathInside,
+  resolveContainedPath,
+  safeStatContainedFile,
+  readContainedFile,
+} from "../../../lib/fs-safe.mjs";
+import {
+  REQUIRED_KEYS,
+  extractSystemState,
+  validateSystemState,
+} from "./analyzer-schema.mjs";
+import {
+  createSyncGitTimeResolver,
+  createAsyncGitTimeResolver,
+} from "./analyzer-git.mjs";
+
+export { REQUIRED_KEYS, extractSystemState, validateSystemState };
 
 const BUNDLED_MOCKERY_CLI = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "../../sf-mockery/scripts/cli.mjs"
 );
-const QUOTED_MOCKERY_CLI = /\s/.test(BUNDLED_MOCKERY_CLI)
-  ? `"${BUNDLED_MOCKERY_CLI}"`
-  : BUNDLED_MOCKERY_CLI;
+const SAFE_MOCKUPS_DIR_RE = /^[a-zA-Z0-9._/-]+$/;
+const IGNORED_REVIEW_ENTRIES = new Set([".DS_Store", ".gitkeep", "Thumbs.db"]);
 
 export const SCHEMA_VERSION = "1.0";
 export const FACTORY_DIR = "docs/factory";
@@ -121,395 +137,82 @@ export const STAGE_DEFS = Object.freeze([
 
 export const STAGE_BY_PHASE = new Map(STAGE_DEFS.map((stage) => [stage.phase, stage]));
 
-export const EDGES = Object.freeze([
-  { from: "vision", to: "market-research", kind: "required" },
-  { from: "vision", to: "brd", kind: "required" },
-  { from: "market-research", to: "brd", kind: "required" },
-  { from: "vision", to: "prd", kind: "required" },
-  { from: "brd", to: "prd", kind: "required" },
-  { from: "vision", to: "ux", kind: "required" },
-  { from: "prd", to: "ux", kind: "required" },
-  { from: "vision", to: "ui", kind: "required" },
-  { from: "ux", to: "ui", kind: "required" },
-  { from: "vision", to: "mockery", kind: "optional" },
-  { from: "ux", to: "mockery", kind: "optional" },
-  { from: "ui", to: "mockery", kind: "optional" },
-  { from: "vision", to: "architecture", kind: "required" },
-  { from: "brd", to: "architecture", kind: "recommended" },
-  { from: "prd", to: "architecture", kind: "required" },
-  { from: "ux", to: "architecture", kind: "required" },
-  { from: "ui", to: "architecture", kind: "required" },
-  { from: "mockery", to: "architecture", kind: "optional" },
-  { from: "vision", to: "specs", kind: "required" },
-  { from: "prd", to: "specs", kind: "required" },
-  { from: "architecture", to: "specs", kind: "required" },
-]);
-
-export const REQUIRED_KEYS = Object.freeze({
-  vision: [
-    "phase",
-    "project_name",
-    "primary_user",
-    "ux_tone",
-    "hard_constraints",
-    "explicitly_out_of_scope",
-  ],
-  "market-research": [
-    "phase",
-    "competitors",
-    "market_gap_defined",
-    "validation_status",
-    "identified_risks",
-  ],
-  brd: [
-    "phase",
-    "monetization_model",
-    "core_kpis",
-    "compliance_requirements",
-    "budget_or_timeline_constraints",
-  ],
-  prd: [
-    "phase",
-    "core_flows",
-    "business_rules",
-    "required_integrations",
-    "edge_case_mitigations",
-  ],
-  ux: [
-    "phase",
-    "screens_required",
-    "primary_navigation_pattern",
-    "key_interactions",
-    "accessibility_requirements",
-  ],
-  ui: [
-    "phase",
-    "css_framework_recommendation",
-    "color_palette",
-    "typography",
-    "border_radius_base",
-  ],
-  mockery: [
-    "phase",
-    "fidelity",
-    "mockups_dir",
-    "devices",
-    "sections",
-    "screens",
-    "components",
-    "edges_count",
-    "tokens_synced_from_ui",
-  ],
-  architecture: [
-    "phase",
-    "frontend_stack",
-    "backend_stack",
-    "database_type",
-    "data_models",
-    "core_endpoints",
-  ],
-  specs: [
-    "phase",
-    "openapi_stubs",
-    "required_unit_tests",
-    "required_e2e_tests",
-    "linter_rules",
-  ],
-  review: [
-    "phase",
-    "source_phases",
-    "target_phase",
-    "verdict",
-    "critical_violations_count",
-    "scope_creep_warnings_count",
-    "blocking_issues",
-  ],
-});
+// Derive EDGES programmatically from STAGE_DEFS (single source of truth).
+export const EDGES = Object.freeze(
+  STAGE_DEFS.flatMap((stage) => [
+    ...stage.requiredUpstreams.map((from) =>
+      Object.freeze({ from, to: stage.phase, kind: "required" })
+    ),
+    ...stage.recommendedUpstreams.map((from) =>
+      Object.freeze({ from, to: stage.phase, kind: "recommended" })
+    ),
+    ...stage.optionalUpstreams.map((from) =>
+      Object.freeze({ from, to: stage.phase, kind: "optional" })
+    ),
+  ])
+);
 
 const REVIEW_FILENAME_RE = /^[a-zA-Z0-9._-]+\.md$/;
 
-/**
- * Extract the trailing <system_state>...</system_state> JSON block and narrative markdown.
- */
-export function extractSystemState(markdown) {
-  const source = typeof markdown === "string" ? markdown : "";
-  const regex = /<system_state>([\s\S]*?)<\/system_state>/gi;
-  let lastMatch = null;
-  let match;
-  while ((match = regex.exec(source)) !== null) {
-    lastMatch = match;
-  }
-
-  if (!lastMatch) {
-    return {
-      found: false,
-      raw: null,
-      state: null,
-      narrative: source.trim(),
-      error: "Missing <system_state>...</system_state> block",
-    };
-  }
-
-  const raw = lastMatch[1].trim();
-  const narrative = (
-    source.slice(0, lastMatch.index) +
-    source.slice(lastMatch.index + lastMatch[0].length)
-  ).trim();
-
-  let parsed;
-  try {
-    parsed = JSON.parse(raw);
-  } catch (err) {
-    return {
-      found: true,
-      raw,
-      state: null,
-      narrative,
-      error: `Invalid JSON in <system_state>: ${err.message}`,
-    };
-  }
-
-  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-    return {
-      found: true,
-      raw,
-      state: null,
-      narrative,
-      error: "<system_state> JSON must be an object",
-    };
-  }
-
-  return {
-    found: true,
-    raw,
-    state: parsed,
-    narrative,
-    error: null,
-  };
+function formatFreshnessSource(sourceA, sourceB) {
+  if (!sourceA && !sourceB) return "mtime";
+  if (sourceA === sourceB || !sourceB) return sourceA || "mtime";
+  if (!sourceA) return sourceB;
+  return `${sourceA}/${sourceB}`;
 }
 
-/**
- * Validate a parsed <system_state> object against the expected phase schema.
- */
-export function validateSystemState(state, expectedPhase, parseError = null) {
-  const errors = [];
-  if (parseError) {
-    errors.push(parseError);
-    return { valid: false, errors };
-  }
-  if (!state || typeof state !== "object" || Array.isArray(state)) {
-    errors.push("Missing or invalid <system_state> object");
-    return { valid: false, errors };
-  }
-
-  if (state.phase !== expectedPhase) {
-    errors.push(
-      `Expected phase "${expectedPhase}", got ${JSON.stringify(state.phase)}`
-    );
-  }
-
-  const requiredKeys = REQUIRED_KEYS[expectedPhase] || [];
-  for (const key of requiredKeys) {
-    if (
-      !Object.prototype.hasOwnProperty.call(state, key) ||
-      state[key] === undefined ||
-      state[key] === null
-    ) {
-      errors.push(`Missing required key "${key}"`);
-    }
-  }
-
-  if (expectedPhase === "mockery") {
-    if (
-      state.fidelity !== undefined &&
-      state.fidelity !== "wireframe" &&
-      state.fidelity !== "styled"
-    ) {
-      errors.push(
-        `Invalid mockery fidelity ${JSON.stringify(state.fidelity)} (expected "wireframe" or "styled")`
-      );
-    }
-    if (
-      state.tokens_synced_from_ui !== undefined &&
-      typeof state.tokens_synced_from_ui !== "boolean"
-    ) {
-      errors.push(`"tokens_synced_from_ui" must be a boolean`);
-    }
-  }
-
-  if (expectedPhase === "review") {
-    if (state.verdict !== "PASS" && state.verdict !== "FAIL") {
-      errors.push(
-        `Invalid review verdict ${JSON.stringify(state.verdict)} (expected "PASS" or "FAIL")`
-      );
-    }
-    if (!Array.isArray(state.source_phases)) {
-      errors.push(`"source_phases" must be an array`);
-    }
-    if (typeof state.target_phase !== "string" || !state.target_phase.trim()) {
-      errors.push(`"target_phase" must be a non-empty string`);
-    }
-    if (!Array.isArray(state.blocking_issues)) {
-      errors.push(`"blocking_issues" must be an array`);
-    }
-    if (typeof state.critical_violations_count !== "number") {
-      errors.push(`"critical_violations_count" must be a number`);
-    }
-    if (typeof state.scope_creep_warnings_count !== "number") {
-      errors.push(`"scope_creep_warnings_count" must be a number`);
-    }
-  }
-
-  return { valid: errors.length === 0, errors };
-}
-
-function createGitTimeResolver(workspaceRoot) {
-  let isGitRepo = null;
-  let dirtyFiles = null;
-  const commitTimeCache = new Map();
-
-  function ensureGitChecked() {
-    if (isGitRepo !== null) return isGitRepo;
-    try {
-      const out = execFileSync("git", ["rev-parse", "--is-inside-work-tree"], {
-        cwd: workspaceRoot,
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "ignore"],
-      }).trim();
-      isGitRepo = out === "true";
-    } catch {
-      isGitRepo = false;
-    }
-    return isGitRepo;
-  }
-
-  function getDirtyFiles() {
-    if (dirtyFiles !== null) return dirtyFiles;
-    dirtyFiles = new Set();
-    if (!ensureGitChecked()) return dirtyFiles;
-    try {
-      const out = execFileSync(
-        "git",
-        ["status", "--porcelain", "--untracked-files=all", "--", FACTORY_DIR],
-        {
-          cwd: workspaceRoot,
-          encoding: "utf8",
-          stdio: ["ignore", "pipe", "ignore"],
-        }
-      );
-      for (const line of out.split(/\r?\n/)) {
-        if (!line || line.length < 4) continue;
-        let rel = line.slice(3).trim();
-        if (rel.includes(" -> ")) {
-          rel = rel.split(" -> ").pop().trim();
-        }
-        if (rel.startsWith('"') && rel.endsWith('"')) {
-          rel = rel.slice(1, -1);
-        }
-        dirtyFiles.add(rel.replaceAll("\\", "/"));
-      }
-    } catch {
-      // Ignore git status failures and treat as no dirty info.
-    }
-    return dirtyFiles;
-  }
-
-  return function getGitTimeMs(relPath) {
-    const normalized = relPath.replaceAll("\\", "/");
-    if (commitTimeCache.has(normalized)) {
-      return commitTimeCache.get(normalized);
-    }
-    if (!ensureGitChecked()) {
-      commitTimeCache.set(normalized, null);
-      return null;
-    }
-    if (getDirtyFiles().has(normalized)) {
-      commitTimeCache.set(normalized, null);
-      return null;
-    }
-    try {
-      const out = execFileSync(
-        "git",
-        ["log", "-1", "--format=%ct", "--", normalized],
-        {
-          cwd: workspaceRoot,
-          encoding: "utf8",
-          stdio: ["ignore", "pipe", "ignore"],
-        }
-      ).trim();
-      if (!out || !/^\d+$/.test(out)) {
-        commitTimeCache.set(normalized, null);
-        return null;
-      }
-      const ms = Number(out) * 1000;
-      commitTimeCache.set(normalized, ms);
-      return ms;
-    } catch {
-      commitTimeCache.set(normalized, null);
-      return null;
-    }
-  };
-}
-
-/**
- * Compare whether fileA is strictly newer than fileB using mtimeMs with a
- * 2000ms git commit-timestamp tiebreaker.
- */
-function compareFileFreshness(fileA, fileB, getGitTimeMs) {
+function isStrictlyNewer(entryA, entryB) {
   if (
-    !fileA ||
-    !fileB ||
-    typeof fileA.mtime_ms !== "number" ||
-    typeof fileB.mtime_ms !== "number"
+    !entryA ||
+    !entryB ||
+    typeof entryA.effective_time_ms !== "number" ||
+    typeof entryB.effective_time_ms !== "number"
   ) {
-    return { aNewer: false, source: "mtime" };
+    return false;
   }
-
-  const diff = Math.abs(fileA.mtime_ms - fileB.mtime_ms);
-  if (diff <= MTIME_TIEBREAKER_MS) {
-    const gitA = getGitTimeMs(fileA.file);
-    const gitB = getGitTimeMs(fileB.file);
-    if (typeof gitA === "number" && typeof gitB === "number") {
-      fileA.effective_time_ms = gitA;
-      fileA.time_source = "git";
-      fileB.effective_time_ms = gitB;
-      fileB.time_source = "git";
-      return { aNewer: gitA > gitB, source: "git" };
-    }
-  }
-
-  return { aNewer: fileA.mtime_ms > fileB.mtime_ms, source: "mtime" };
+  return entryA.effective_time_ms > entryB.effective_time_ms;
 }
 
-function safeStat(absPath) {
-  try {
-    const st = fs.statSync(absPath);
-    return st.isFile() ? st : null;
-  } catch {
-    return null;
-  }
-}
-
-function isPathInside(baseDir, targetPath) {
-  const resolvedBase = path.resolve(baseDir);
-  const resolvedTarget = path.resolve(targetPath);
-  return (
-    resolvedTarget === resolvedBase ||
-    resolvedTarget.startsWith(resolvedBase + path.sep)
-  );
-}
-
-function sanitizeMockupsDir(workspaceRoot, candidate) {
+export function sanitizeMockupsDir(workspaceRoot, candidate) {
   if (typeof candidate !== "string" || !candidate.trim()) {
     return DEFAULT_MOCKUPS_DIR;
   }
-  const trimmed = candidate.trim().replaceAll("\\", "/").replace(/\/+$/, "");
-  const absFactory = path.resolve(workspaceRoot, FACTORY_DIR);
-  const absCandidate = path.resolve(workspaceRoot, trimmed);
+  const trimmed = candidate.trim().replace(/\/+$/, "");
+  if (!trimmed || trimmed.startsWith("/") || !SAFE_MOCKUPS_DIR_RE.test(trimmed)) {
+    return DEFAULT_MOCKUPS_DIR;
+  }
+  const segments = trimmed.split("/");
+  if (segments.some((seg) => seg === "" || seg === "..")) {
+    return DEFAULT_MOCKUPS_DIR;
+  }
+  const absRoot = path.resolve(workspaceRoot);
+  const absFactory = path.resolve(absRoot, FACTORY_DIR);
+  const absCandidate = path.resolve(absRoot, trimmed);
   if (!isPathInside(absFactory, absCandidate)) {
     return DEFAULT_MOCKUPS_DIR;
   }
-  return path.relative(workspaceRoot, absCandidate).replaceAll("\\", "/");
+  const normalized = path.relative(absRoot, absCandidate).replaceAll("\\", "/");
+  if (!SAFE_MOCKUPS_DIR_RE.test(normalized)) {
+    return DEFAULT_MOCKUPS_DIR;
+  }
+  return normalized;
+}
+
+function resolveMockeryCliInvocation() {
+  try {
+    if (fs.existsSync(BUNDLED_MOCKERY_CLI) && fs.statSync(BUNDLED_MOCKERY_CLI).isFile()) {
+      return {
+        available: true,
+        prefix: `node ${posixShellQuote(BUNDLED_MOCKERY_CLI)}`,
+      };
+    }
+  } catch {
+    // fall through to clean fallback
+  }
+  return {
+    available: false,
+    prefix: "node <sf-mockery-skill-dir>/scripts/cli.mjs",
+  };
 }
 
 function analyzeMockery(workspaceRoot, mockeryNode) {
@@ -520,9 +223,10 @@ function analyzeMockery(workspaceRoot, mockeryNode) {
     state ? state.mockups_dir : DEFAULT_MOCKUPS_DIR
   );
   const absMockupsDir = path.resolve(workspaceRoot, mockupsDir);
-  const absFlowJson = path.join(absMockupsDir, "flow.json");
-  const flowStat = safeStat(absFlowJson);
-  const flowJsonExists = Boolean(flowStat);
+  const flowRelPath = `${mockupsDir}/flow.json`;
+  const flowRead = readContainedFile(workspaceRoot, flowRelPath);
+  const flowJsonExists = flowRead.ok;
+  const flowMtimeMs = flowJsonExists && flowRead.stat ? Math.round(flowRead.stat.mtimeMs) : null;
 
   let flowJsonValid = false;
   let flowData = null;
@@ -530,7 +234,7 @@ function analyzeMockery(workspaceRoot, mockeryNode) {
 
   if (flowJsonExists) {
     try {
-      const parsed = JSON.parse(fs.readFileSync(absFlowJson, "utf8"));
+      const parsed = JSON.parse(flowRead.content);
       if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
         flowJsonValid = true;
         flowData = parsed;
@@ -554,12 +258,20 @@ function analyzeMockery(workspaceRoot, mockeryNode) {
     flowData && Array.isArray(flowData.sections) ? flowData.sections : [];
 
   let diskComponents = [];
-  const absComponentsDir = path.join(absMockupsDir, "components");
+  const compDirRes = resolveContainedPath(workspaceRoot, `${mockupsDir}/components`, {
+    allowBase: false,
+    allowSymlinks: false,
+    requireFile: false,
+  });
   try {
-    if (fs.existsSync(absComponentsDir) && fs.statSync(absComponentsDir).isDirectory()) {
+    if (compDirRes.ok && compDirRes.stat && compDirRes.stat.isDirectory()) {
       diskComponents = fs
-        .readdirSync(absComponentsDir)
-        .filter((f) => f.endsWith(".html"))
+        .readdirSync(compDirRes.realPath)
+        .filter(
+          (f) =>
+            f.endsWith(".html") &&
+            Boolean(safeStatContainedFile(workspaceRoot, path.join(compDirRes.absPath, f)))
+        )
         .map((f) => f.replace(/\.html$/, ""))
         .sort();
     }
@@ -623,7 +335,10 @@ function analyzeMockery(workspaceRoot, mockeryNode) {
       for (const node of flowNodes) {
         if (node && typeof node.file === "string" && node.file.trim()) {
           const targetScreen = path.resolve(absMockupsDir, node.file);
-          if (!isPathInside(absMockupsDir, targetScreen) || !safeStat(targetScreen)) {
+          if (
+            !isPathInside(absMockupsDir, targetScreen) ||
+            !safeStatContainedFile(workspaceRoot, targetScreen)
+          ) {
             parityWarnings.push(
               `flow.json parity drift: referenced screen file "${node.file}" does not exist under ${mockupsDir}`
             );
@@ -637,58 +352,95 @@ function analyzeMockery(workspaceRoot, mockeryNode) {
     );
   }
 
-  const screensCount = state && Array.isArray(state.screens)
-    ? state.screens.length
-    : flowNodes.length;
-  const componentsCount = state && Array.isArray(state.components)
-    ? state.components.length
-    : diskComponents.length;
+  const screensCount =
+    state && Array.isArray(state.screens) ? state.screens.length : flowNodes.length;
+  const componentsCount =
+    state && Array.isArray(state.components)
+      ? state.components.length
+      : diskComponents.length;
   const edgesCount =
     state && typeof state.edges_count === "number"
       ? state.edges_count
       : flowEdges.length;
 
+  const cliInfo = resolveMockeryCliInvocation();
+  const quotedMockupsDir = posixShellQuote(mockupsDir);
+
   return {
-    manifest_exists: manifestExists,
-    mockups_dir: mockupsDir,
-    flow_json_exists: flowJsonExists,
-    flow_json_valid: flowJsonValid,
-    fidelity:
-      state && (state.fidelity === "wireframe" || state.fidelity === "styled")
-        ? state.fidelity
-        : null,
-    tokens_synced_from_ui:
-      state && typeof state.tokens_synced_from_ui === "boolean"
-        ? state.tokens_synced_from_ui
-        : null,
-    screens_count: screensCount,
-    components_count: componentsCount,
-    edges_count: edgesCount,
-    parity_warnings: parityWarnings,
-    viewer_command: `node ${QUOTED_MOCKERY_CLI} serve ${mockupsDir}`,
-    check_command: `node ${QUOTED_MOCKERY_CLI} check ${mockupsDir}`,
-    export_command: `node ${QUOTED_MOCKERY_CLI} export ${mockupsDir}`,
+    summary: {
+      manifest_exists: manifestExists,
+      mockups_dir: mockupsDir,
+      flow_json_exists: flowJsonExists,
+      flow_json_valid: flowJsonValid,
+      fidelity:
+        state && (state.fidelity === "wireframe" || state.fidelity === "styled")
+          ? state.fidelity
+          : null,
+      tokens_synced_from_ui:
+        state && typeof state.tokens_synced_from_ui === "boolean"
+          ? state.tokens_synced_from_ui
+          : null,
+      screens_count: screensCount,
+      components_count: componentsCount,
+      edges_count: edgesCount,
+      parity_warnings: parityWarnings,
+      mockery_cli_available: cliInfo.available,
+      viewer_command: `${cliInfo.prefix} serve ${quotedMockupsDir}`,
+      check_command: `${cliInfo.prefix} check ${quotedMockupsDir}`,
+      export_command: `${cliInfo.prefix} export ${quotedMockupsDir}`,
+    },
+    flowFile: flowJsonExists
+      ? { file: flowRelPath, mtime_ms: flowMtimeMs }
+      : null,
   };
 }
 
 function readAllReviews(workspaceRoot) {
-  const absReviewsDir = path.resolve(workspaceRoot, REVIEWS_DIR);
-  if (!fs.existsSync(absReviewsDir)) return [];
+  const warnings = [];
+  const dirRes = resolveContainedPath(workspaceRoot, REVIEWS_DIR, {
+    allowBase: false,
+    allowSymlinks: false,
+    requireFile: false,
+  });
+  if (!dirRes.ok) {
+    if (dirRes.reason !== "not_found") {
+      warnings.push(`Skipped unsafe reviews directory ${REVIEWS_DIR} (${dirRes.reason})`);
+    }
+    return { reviews: [], warnings };
+  }
+  if (!dirRes.stat || !dirRes.stat.isDirectory()) {
+    return { reviews: [], warnings };
+  }
+
   let entries;
   try {
-    entries = fs.readdirSync(absReviewsDir);
+    entries = fs.readdirSync(dirRes.realPath);
   } catch {
-    return [];
+    return { reviews: [], warnings };
   }
 
   const reviews = [];
   for (const name of entries.sort()) {
-    if (!REVIEW_FILENAME_RE.test(name)) continue;
-    const absPath = path.join(absReviewsDir, name);
-    const st = safeStat(absPath);
-    if (!st) continue;
+    if (IGNORED_REVIEW_ENTRIES.has(name)) continue;
+
+    if (!REVIEW_FILENAME_RE.test(name)) {
+      warnings.push(
+        `Unrecognized review file in ${REVIEWS_DIR}: "${name}" (expected [a-zA-Z0-9._-]+.md)`
+      );
+      continue;
+    }
+
     const relPath = `${REVIEWS_DIR}/${name}`;
-    const rawMarkdown = fs.readFileSync(absPath, "utf8");
+    const fileRes = readContainedFile(workspaceRoot, relPath);
+    if (!fileRes.ok) {
+      warnings.push(
+        `Skipped unreadable or unsafe review file ${relPath} (${fileRes.reason})`
+      );
+      continue;
+    }
+
+    const st = fileRes.stat;
+    const rawMarkdown = fileRes.content;
     const extracted = extractSystemState(rawMarkdown);
     const validation = validateSystemState(
       extracted.state,
@@ -696,10 +448,14 @@ function readAllReviews(workspaceRoot) {
       extracted.error
     );
     if (!validation.valid) {
+      warnings.push(
+        `Invalid review file ${relPath}: ${validation.errors.join("; ")}`
+      );
       continue;
     }
 
     const s = extracted.state;
+    const mtimeMs = Math.round(st.mtimeMs);
     reviews.push({
       file: relPath,
       source_phases: s.source_phases.map((p) => String(p)),
@@ -708,14 +464,30 @@ function readAllReviews(workspaceRoot) {
       critical_violations_count: s.critical_violations_count,
       scope_creep_warnings_count: s.scope_creep_warnings_count,
       blocking_issues: s.blocking_issues.map((b) => String(b)),
-      mtime_ms: Math.round(st.mtimeMs),
-      effective_time_ms: Math.round(st.mtimeMs),
+      mtime_ms: mtimeMs,
+      effective_time_ms: mtimeMs,
       time_source: "mtime",
       is_stale: false,
       stale_reasons: [],
     });
   }
-  return reviews;
+  return { reviews, warnings };
+}
+
+/**
+ * Group a node's newest-first sorted reviews by canonical `(source_phases, target_phase)` key,
+ * returning the latest effective verdict for each distinct audit pair.
+ */
+function getEffectiveReviews(sortedReviews) {
+  const byPair = new Map();
+  for (const rev of sortedReviews) {
+    const srcKey = [...new Set(rev.source_phases)].sort().join(",");
+    const pairKey = `${srcKey}->${rev.target_phase}`;
+    if (!byPair.has(pairKey)) {
+      byPair.set(pairKey, rev);
+    }
+  }
+  return [...byPair.values()];
 }
 
 function buildNextPrompt(node, stageDef, nodeByPhase, allNodes) {
@@ -759,16 +531,20 @@ function buildNextPrompt(node, stageDef, nodeByPhase, allNodes) {
     return `Repair the malformed <system_state> JSON block in ${node.file} (${errs}) so it satisfies the ${stageDef.skill} schema.`;
   }
 
-  const latestReview = node.reviews[0] || null;
+  const effectiveReviews = getEffectiveReviews(node.reviews);
+  const failingReview =
+    effectiveReviews.find((r) => r.verdict === "FAIL") || node.reviews[0] || null;
+  const staleReview =
+    effectiveReviews.find((r) => r.is_stale) || node.reviews[0] || null;
 
   if (node.status === "reviewed_fail") {
     const issues =
-      latestReview && latestReview.blocking_issues.length > 0
-        ? ` (${latestReview.blocking_issues.join("; ")})`
+      failingReview && failingReview.blocking_issues.length > 0
+        ? ` (${failingReview.blocking_issues.join("; ")})`
         : "";
     const sources =
-      latestReview && latestReview.source_phases.length > 0
-        ? formatFileList(latestReview.source_phases)
+      failingReview && failingReview.source_phases.length > 0
+        ? formatFileList(failingReview.source_phases)
         : formatFileList(existingUpstreamPhases);
     const staleNote = node.is_stale
       ? " and reconcile newer upstream changes"
@@ -797,12 +573,13 @@ function buildNextPrompt(node, stageDef, nodeByPhase, allNodes) {
     return `Run sf-review comparing ${sources} against ${node.file} to validate upstream constraints, scope, and <system_state> parity.`;
   }
 
-  if (latestReview && latestReview.is_stale) {
+  if (node.status === "review_stale" || (staleReview && staleReview.is_stale)) {
     const sources =
-      latestReview.source_phases.length > 0
-        ? formatFileList(latestReview.source_phases)
+      staleReview && staleReview.source_phases.length > 0
+        ? formatFileList(staleReview.source_phases)
         : formatFileList(existingUpstreamPhases);
-    return `Re-run sf-review comparing ${sources || "upstream artifacts"} against ${node.file} because the previous review (${latestReview.file}) is stale.`;
+    const revFile = staleReview ? staleReview.file : "previous review";
+    return `Re-run sf-review comparing ${sources || "upstream artifacts"} against ${node.file} because the previous review (${revFile}) is stale.`;
   }
 
   const nextUnlocked = allNodes.find(
@@ -814,19 +591,11 @@ function buildNextPrompt(node, stageDef, nodeByPhase, allNodes) {
   return `${node.file} passed review and is up to date.`;
 }
 
-/**
- * Analyze a consumer workspace's docs/factory/ directory and emit Graph JSON v1.
- */
-export function analyzeWorkspace(workspaceRoot = process.cwd(), options = {}) {
-  const absRoot = path.resolve(workspaceRoot);
-  const getGitTimeMs = createGitTimeResolver(absRoot);
+function readStageNodes(absRoot) {
+  return STAGE_DEFS.map((stageDef) => {
+    const fileRes = readContainedFile(absRoot, stageDef.file);
 
-  // 1. Read and parse all 9 canonical stage files.
-  const nodes = STAGE_DEFS.map((stageDef) => {
-    const absFile = path.resolve(absRoot, stageDef.file);
-    const st = safeStat(absFile);
-
-    if (!st) {
+    if (!fileRes.ok) {
       return {
         phase: stageDef.phase,
         stage: stageDef.stage,
@@ -844,13 +613,15 @@ export function analyzeWorkspace(workspaceRoot = process.cwd(), options = {}) {
         system_state: null,
         is_stale: false,
         stale_reasons: [],
+        review_stale: false,
         warnings: [],
         reviews: [],
         next_prompt: "",
       };
     }
 
-    const rawMarkdown = fs.readFileSync(absFile, "utf8");
+    const st = fileRes.stat;
+    const rawMarkdown = fileRes.content;
     const extracted = extractSystemState(rawMarkdown);
     const validation = validateSystemState(
       extracted.state,
@@ -876,38 +647,72 @@ export function analyzeWorkspace(workspaceRoot = process.cwd(), options = {}) {
       system_state: validation.valid ? extracted.state : null,
       is_stale: false,
       stale_reasons: [],
+      review_stale: false,
       warnings: [],
       reviews: [],
       next_prompt: "",
     };
   });
+}
 
+function finalizeWorkspaceGraph({
+  absRoot,
+  nodes,
+  allReviews,
+  reviewWarnings,
+  mockerySummary,
+  flowFreshness,
+  options,
+}) {
   const nodeByPhase = new Map(nodes.map((n) => [n.phase, n]));
+  const topWarnings = [...reviewWarnings];
 
-  // 2. Parse and attach reviews from docs/factory/reviews/*.md.
-  const allReviews = readAllReviews(absRoot);
+  // 1. Attach reviews and evaluate review staleness against canonical scalar timestamps.
   for (const review of allReviews) {
     const targetNode = nodeByPhase.get(review.target_phase);
-    if (!targetNode) continue;
+    if (!targetNode) {
+      topWarnings.push(
+        `Review file ${review.file} targets unknown phase "${review.target_phase}"`
+      );
+      continue;
+    }
 
-    // Check review staleness against target artifact and source_phases.
     if (targetNode.exists) {
-      const cmp = compareFileFreshness(targetNode, review, getGitTimeMs);
-      if (cmp.aNewer) {
+      if (isStrictlyNewer(targetNode, review)) {
         review.is_stale = true;
         review.stale_reasons.push(
-          `Target ${targetNode.file} is newer than review (${cmp.source})`
+          `Target ${targetNode.file} is newer than review (${formatFreshnessSource(targetNode.time_source, review.time_source)})`
+        );
+      }
+      if (
+        targetNode.phase === "mockery" &&
+        flowFreshness &&
+        isStrictlyNewer(flowFreshness, review)
+      ) {
+        review.is_stale = true;
+        review.stale_reasons.push(
+          `Target ${flowFreshness.file} is newer than review (${formatFreshnessSource(flowFreshness.time_source, review.time_source)})`
         );
       }
     }
+
     for (const srcPhase of review.source_phases) {
       const srcNode = nodeByPhase.get(srcPhase);
       if (srcNode && srcNode.exists) {
-        const cmp = compareFileFreshness(srcNode, review, getGitTimeMs);
-        if (cmp.aNewer) {
+        if (isStrictlyNewer(srcNode, review)) {
           review.is_stale = true;
           review.stale_reasons.push(
-            `Source ${srcNode.file} is newer than review (${cmp.source})`
+            `Source ${srcNode.file} is newer than review (${formatFreshnessSource(srcNode.time_source, review.time_source)})`
+          );
+        }
+        if (
+          srcPhase === "mockery" &&
+          flowFreshness &&
+          isStrictlyNewer(flowFreshness, review)
+        ) {
+          review.is_stale = true;
+          review.stale_reasons.push(
+            `Source ${flowFreshness.file} is newer than review (${formatFreshnessSource(flowFreshness.time_source, review.time_source)})`
           );
         }
       }
@@ -916,20 +721,20 @@ export function analyzeWorkspace(workspaceRoot = process.cwd(), options = {}) {
     targetNode.reviews.push(review);
   }
 
-  // Sort each node's reviews newest-first (with git tiebreaker + deterministic filename fallback).
+  // 2. Sort each node's reviews newest-first using strict weak ordering (no node mutation).
   for (const node of nodes) {
     if (node.reviews.length > 1) {
       node.reviews.sort((a, b) => {
-        const cmpAB = compareFileFreshness(a, b, getGitTimeMs);
-        if (cmpAB.aNewer) return -1;
-        const cmpBA = compareFileFreshness(b, a, getGitTimeMs);
-        if (cmpBA.aNewer) return 1;
+        if (b.effective_time_ms !== a.effective_time_ms) {
+          return b.effective_time_ms - a.effective_time_ms;
+        }
         return b.file.localeCompare(a.file);
       });
     }
   }
 
-  // 3. Determine primary status for each node.
+  // 3. Determine primary status per node, aggregating verdicts per (source_phases, target_phase)
+  //    so a newer PASS against one upstream never masks an unresolved FAIL against another.
   for (const stageDef of STAGE_DEFS) {
     const node = nodeByPhase.get(stageDef.phase);
     if (!node.exists) {
@@ -943,23 +748,35 @@ export function analyzeWorkspace(workspaceRoot = process.cwd(), options = {}) {
     } else if (node.reviews.length === 0) {
       node.status = "unreviewed";
     } else {
-      const latest = node.reviews[0];
-      node.status = latest.verdict === "PASS" ? "reviewed_pass" : "reviewed_fail";
+      const effectiveReviews = getEffectiveReviews(node.reviews);
+      const hasActiveFail = effectiveReviews.some((r) => r.verdict === "FAIL");
+      if (hasActiveFail) {
+        node.status = "reviewed_fail";
+        node.review_stale = false;
+      } else {
+        const hasStalePass = effectiveReviews.some((r) => r.is_stale);
+        if (hasStalePass) {
+          node.status = "review_stale";
+          node.review_stale = true;
+        } else {
+          node.status = "reviewed_pass";
+          node.review_stale = false;
+        }
+      }
     }
   }
 
-  // 4. Compute artifact staleness & transitive downstream blast radius in topological order.
+  // 4. Compute artifact staleness & transitive downstream blast radius in topological order,
+  //    including required, recommended, and optional upstreams plus mockups/flow.json freshness.
   for (const stageDef of STAGE_DEFS) {
     const node = nodeByPhase.get(stageDef.phase);
     if (!node.exists) continue;
 
-    const stalenessParents = [...stageDef.requiredUpstreams];
-    if (stageDef.phase === "mockery") {
-      const uiNode = nodeByPhase.get("ui");
-      if (uiNode && uiNode.exists) {
-        stalenessParents.push("ui");
-      }
-    }
+    const stalenessParents = [
+      ...stageDef.requiredUpstreams,
+      ...stageDef.recommendedUpstreams,
+      ...stageDef.optionalUpstreams,
+    ];
 
     for (const parentPhase of stalenessParents) {
       const parent = nodeByPhase.get(parentPhase);
@@ -977,8 +794,20 @@ export function analyzeWorkspace(workspaceRoot = process.cwd(), options = {}) {
         );
       }
 
-      const cmp = compareFileFreshness(parent, node, getGitTimeMs);
-      if (cmp.aNewer) {
+      let effectiveParent = parent;
+      if (
+        parentPhase === "mockery" &&
+        flowFreshness &&
+        isStrictlyNewer(flowFreshness, parent)
+      ) {
+        effectiveParent = flowFreshness;
+      }
+
+      if (isStrictlyNewer(effectiveParent, node)) {
+        const srcLabel = formatFreshnessSource(
+          effectiveParent.time_source,
+          node.time_source
+        );
         node.is_stale = true;
         if (
           stageDef.phase === "mockery" &&
@@ -986,34 +815,30 @@ export function analyzeWorkspace(workspaceRoot = process.cwd(), options = {}) {
           node.system_state?.fidelity === "wireframe"
         ) {
           node.stale_reasons.push(
-            `Upstream ${parent.file} is newer than wireframe ${node.file} (${cmp.source}) — restyle ready`
+            `Upstream ${effectiveParent.file} is newer than wireframe ${node.file} (${srcLabel}) — restyle ready`
           );
         } else {
           node.stale_reasons.push(
-            `Upstream ${parent.file} is newer than ${node.file} (${cmp.source})`
+            `Upstream ${effectiveParent.file} is newer than ${node.file} (${srcLabel})`
           );
         }
       }
     }
   }
 
-  // 5. Analyze Stage 6b Mockery & flow.json parity.
-  const mockeryNode = nodeByPhase.get("mockery");
-  const mockerySummary = analyzeMockery(absRoot, mockeryNode);
-
-  // 6. Compute semantic warnings.
+  // 5. Compute semantic warnings.
   const mrNode = nodeByPhase.get("market-research");
   if (
     mrNode.exists &&
     mrNode.state_valid &&
-    typeof mrNode.system_state?.validation_status === "string" &&
-    mrNode.system_state.validation_status.toLowerCase().includes("pivot required")
+    mrNode.system_state?.validation_status === "Pivot Required"
   ) {
     mrNode.warnings.push(
       "Pivot Required: market-research validation_status flagged Pivot Required — confirm direction before advancing to sf-brd"
     );
   }
 
+  const mockeryNode = nodeByPhase.get("mockery");
   const uiNode = nodeByPhase.get("ui");
   if (mockeryNode.exists && mockeryNode.state_valid) {
     if (
@@ -1023,14 +848,6 @@ export function analyzeWorkspace(workspaceRoot = process.cwd(), options = {}) {
     ) {
       mockeryNode.warnings.push(
         "wireframe_ready_for_restyle: docs/factory/06-ui.md exists while 06b-mockery.md is in wireframe mode — re-run sf-mockery to sync UI tokens"
-      );
-    }
-    if (
-      mockeryNode.system_state.fidelity === "styled" &&
-      mockeryNode.system_state.tokens_synced_from_ui === false
-    ) {
-      mockeryNode.warnings.push(
-        "tokens_not_synced: 06b-mockery.md fidelity is styled but tokens_synced_from_ui is false"
       );
     }
   }
@@ -1049,7 +866,7 @@ export function analyzeWorkspace(workspaceRoot = process.cwd(), options = {}) {
     );
   }
 
-  // 7. Strip internal review helper fields to match v1 Graph JSON contract cleanly.
+  // 6. Strip internal review helper fields to match v1 Graph JSON contract cleanly.
   for (const node of nodes) {
     node.reviews = node.reviews.map((r) => ({
       file: r.file,
@@ -1060,18 +877,20 @@ export function analyzeWorkspace(workspaceRoot = process.cwd(), options = {}) {
       scope_creep_warnings_count: r.scope_creep_warnings_count,
       blocking_issues: r.blocking_issues,
       mtime_ms: r.mtime_ms,
+      effective_time_ms: r.effective_time_ms,
+      time_source: r.time_source,
       is_stale: r.is_stale,
       stale_reasons: r.stale_reasons,
     }));
   }
 
-  // 8. Generate state-aware next_prompt strings.
+  // 7. Generate state-aware next_prompt strings.
   for (const stageDef of STAGE_DEFS) {
     const node = nodeByPhase.get(stageDef.phase);
     node.next_prompt = buildNextPrompt(node, stageDef, nodeByPhase, nodes);
   }
 
-  // 9. Build project summary & top-level payload.
+  // 8. Build project summary & top-level payload.
   const visionNode = nodeByPhase.get("vision");
   const projectName =
     visionNode.exists &&
@@ -1090,6 +909,7 @@ export function analyzeWorkspace(workspaceRoot = process.cwd(), options = {}) {
     workspace_root: absRoot,
     factory_dir: FACTORY_DIR,
     project_name: projectName,
+    warnings: topWarnings,
     summary: {
       core_total: coreNodes.length,
       core_completed: coreNodes.filter((n) => n.exists && n.state_valid).length,
@@ -1099,17 +919,129 @@ export function analyzeWorkspace(workspaceRoot = process.cwd(), options = {}) {
         .filter((n) => n.status === "unlocked")
         .map((n) => n.phase),
       stale_phases: nodes.filter((n) => n.is_stale).map((n) => n.phase),
+      stale_review_phases: nodes
+        .filter((n) => n.review_stale)
+        .map((n) => n.phase),
       failing_review_phases: nodes
         .filter((n) => n.status === "reviewed_fail")
         .map((n) => n.phase),
       invalid_phases: nodes
         .filter((n) => n.status === "invalid")
         .map((n) => n.phase),
+      warnings: topWarnings,
     },
     nodes,
     edges: EDGES.map((e) => ({ ...e })),
     mockery: mockerySummary,
   };
+}
+
+/**
+ * Synchronously analyze a consumer workspace's docs/factory/ directory and emit Graph JSON v1.
+ */
+export function analyzeWorkspace(workspaceRoot = process.cwd(), options = {}) {
+  const absRoot = path.resolve(workspaceRoot);
+  const gitResolver = createSyncGitTimeResolver(absRoot, FACTORY_DIR);
+
+  const nodes = readStageNodes(absRoot);
+  const { reviews: allReviews, warnings: reviewWarnings } = readAllReviews(absRoot);
+  const mockeryNode = nodes.find((n) => n.phase === "mockery");
+  const { summary: mockerySummary, flowFile } = analyzeMockery(absRoot, mockeryNode);
+
+  // Compute canonical scalar freshness timestamp upfront for every existing artifact, review, and flow.json.
+  for (const node of nodes) {
+    if (!node.exists) continue;
+    const f = gitResolver.resolveCanonicalFreshness(node.file, node.mtime_ms);
+    node.effective_time_ms = f.effective_time_ms;
+    node.time_source = f.time_source;
+  }
+  for (const rev of allReviews) {
+    const f = gitResolver.resolveCanonicalFreshness(rev.file, rev.mtime_ms);
+    rev.effective_time_ms = f.effective_time_ms;
+    rev.time_source = f.time_source;
+  }
+  let flowFreshness = null;
+  if (flowFile && typeof flowFile.mtime_ms === "number") {
+    const f = gitResolver.resolveCanonicalFreshness(flowFile.file, flowFile.mtime_ms);
+    flowFreshness = {
+      file: flowFile.file,
+      mtime_ms: flowFile.mtime_ms,
+      effective_time_ms: f.effective_time_ms,
+      time_source: f.time_source,
+    };
+  }
+
+  return finalizeWorkspaceGraph({
+    absRoot,
+    nodes,
+    allReviews,
+    reviewWarnings,
+    mockerySummary,
+    flowFreshness,
+    options,
+  });
+}
+
+/**
+ * Asynchronously analyze a consumer workspace's docs/factory/ directory using non-blocking
+ * memoized git subprocesses (used by server.mjs broadcasts & API endpoints).
+ */
+export async function analyzeWorkspaceAsync(
+  workspaceRoot = process.cwd(),
+  options = {}
+) {
+  const absRoot = path.resolve(workspaceRoot);
+  const gitResolver = createAsyncGitTimeResolver(absRoot, FACTORY_DIR);
+
+  const nodes = readStageNodes(absRoot);
+  const { reviews: allReviews, warnings: reviewWarnings } = readAllReviews(absRoot);
+  const mockeryNode = nodes.find((n) => n.phase === "mockery");
+  const { summary: mockerySummary, flowFile } = analyzeMockery(absRoot, mockeryNode);
+
+  const tasks = [];
+  for (const node of nodes) {
+    if (!node.exists) continue;
+    tasks.push(
+      gitResolver.resolveCanonicalFreshness(node.file, node.mtime_ms).then((f) => {
+        node.effective_time_ms = f.effective_time_ms;
+        node.time_source = f.time_source;
+      })
+    );
+  }
+  for (const rev of allReviews) {
+    tasks.push(
+      gitResolver.resolveCanonicalFreshness(rev.file, rev.mtime_ms).then((f) => {
+        rev.effective_time_ms = f.effective_time_ms;
+        rev.time_source = f.time_source;
+      })
+    );
+  }
+
+  let flowFreshness = null;
+  if (flowFile && typeof flowFile.mtime_ms === "number") {
+    tasks.push(
+      gitResolver.resolveCanonicalFreshness(flowFile.file, flowFile.mtime_ms).then((f) => {
+        flowFreshness = {
+          file: flowFile.file,
+          mtime_ms: flowFile.mtime_ms,
+          effective_time_ms: f.effective_time_ms,
+          time_source: f.time_source,
+        };
+      })
+    );
+  }
+
+  await Promise.all(tasks);
+
+  return finalizeWorkspaceGraph({
+    absRoot,
+    nodes,
+    allReviews,
+    reviewWarnings,
+    mockerySummary,
+    flowFreshness,
+    options,
+  });
 }
 
 /**
@@ -1126,19 +1058,22 @@ export function readArtifactDetail(workspaceRoot, phase) {
     return null;
   }
 
-  const st = safeStat(absFile);
-  if (!st) {
-    return {
-      phase: stageDef.phase,
-      file: stageDef.file,
-      exists: false,
-      narrative_markdown: "",
-      system_state: null,
-      raw_markdown: "",
-    };
+  const fileRes = readContainedFile(absRoot, stageDef.file);
+  if (!fileRes.ok) {
+    if (fileRes.reason === "not_found") {
+      return {
+        phase: stageDef.phase,
+        file: stageDef.file,
+        exists: false,
+        narrative_markdown: "",
+        system_state: null,
+        raw_markdown: "",
+      };
+    }
+    return null;
   }
 
-  const rawMarkdown = fs.readFileSync(absFile, "utf8");
+  const rawMarkdown = fileRes.content;
   const extracted = extractSystemState(rawMarkdown);
   return {
     phase: stageDef.phase,
@@ -1152,7 +1087,7 @@ export function readArtifactDetail(workspaceRoot, phase) {
 
 /**
  * Read a single allowlisted review markdown file under docs/factory/reviews/.
- * Rejects any path traversal, invalid filename, or symlink escaping reviews dir.
+ * Rejects any path traversal, invalid filename, or symlink escaping workspace/reviews dir.
  */
 export function readReviewDetail(workspaceRoot, filename) {
   if (
@@ -1166,43 +1101,27 @@ export function readReviewDetail(workspaceRoot, filename) {
   }
 
   const absRoot = path.resolve(workspaceRoot);
-  const absReviewsDir = path.resolve(absRoot, REVIEWS_DIR);
-  const absTarget = path.resolve(absReviewsDir, filename);
+  const relPath = `${REVIEWS_DIR}/${filename}`;
+  const res = resolveContainedPath(absRoot, relPath, {
+    allowBase: false,
+    allowSymlinks: false,
+    requireFile: true,
+  });
 
-  if (!isPathInside(absReviewsDir, absTarget) || absTarget === absReviewsDir) {
-    return { error: "invalid_filename", status: 400 };
-  }
-
-  let lstat;
-  try {
-    lstat = fs.lstatSync(absTarget);
-  } catch {
-    return { error: "not_found", status: 404 };
-  }
-  if (lstat.isSymbolicLink()) {
-    return { error: "invalid_filename", status: 400 };
-  }
-  if (!lstat.isFile()) {
-    return { error: "not_found", status: 404 };
-  }
-
-  try {
-    const realReviews = fs.realpathSync(absReviewsDir);
-    const realTarget = fs.realpathSync(absTarget);
-    if (!isPathInside(realReviews, realTarget)) {
-      return { error: "invalid_filename", status: 400 };
+  if (!res.ok) {
+    if (res.reason === "not_found" || res.reason === "not_a_file") {
+      return { error: "not_found", status: 404 };
     }
-  } catch {
-    return { error: "not_found", status: 404 };
+    return { error: "invalid_filename", status: 400 };
   }
 
-  const rawMarkdown = fs.readFileSync(absTarget, "utf8");
+  const rawMarkdown = fs.readFileSync(res.realPath, "utf8");
   const extracted = extractSystemState(rawMarkdown);
   return {
     status: 200,
     data: {
       filename,
-      file: `${REVIEWS_DIR}/${filename}`,
+      file: relPath,
       exists: true,
       narrative_markdown: extracted.narrative,
       system_state: extracted.state,

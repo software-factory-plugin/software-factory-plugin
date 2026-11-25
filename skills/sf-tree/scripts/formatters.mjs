@@ -16,6 +16,9 @@ function statusTag(node) {
     case "reviewed_pass":
       tags.push("PASS");
       break;
+    case "review_stale":
+      tags.push("REVIEW STALE");
+      break;
     case "reviewed_fail":
       tags.push("FAIL");
       break;
@@ -36,7 +39,11 @@ function statusTag(node) {
     tags.push("STALE");
   }
   const latestReview = node.reviews && node.reviews[0];
-  if (latestReview && latestReview.is_stale && !node.is_stale) {
+  if (
+    node.status !== "review_stale" &&
+    (node.review_stale || (latestReview && latestReview.is_stale)) &&
+    !node.is_stale
+  ) {
     tags.push("REVIEW STALE");
   }
   return tags.join(" · ");
@@ -45,7 +52,7 @@ function statusTag(node) {
 function mermaidClassForNode(node) {
   if (node.status === "invalid") return "invalid";
   if (node.status === "reviewed_fail") return "fail";
-  if (node.is_stale) return "stale";
+  if (node.is_stale || node.status === "review_stale") return "stale";
   switch (node.status) {
     case "reviewed_pass":
       return "pass";
@@ -58,8 +65,18 @@ function mermaidClassForNode(node) {
   }
 }
 
-function escapeMermaidLabel(text) {
-  return String(text).replaceAll('"', "'");
+export function escapeMermaidLabel(text) {
+  return String(text ?? "")
+    .replace(/[\r\n\t]+/g, " ")
+    .replace(/[\x00-\x1f\x7f]/g, "")
+    .replace(/\\(?!n)/g, "/")
+    .replaceAll('"', "'")
+    .replaceAll("`", "'")
+    .replaceAll("<", "‹")
+    .replaceAll(">", "›")
+    .replaceAll("&", "+")
+    .replaceAll("#", "№")
+    .replaceAll(";", ",");
 }
 
 /**
@@ -130,6 +147,9 @@ function asciiBadge(node) {
     case "reviewed_pass":
       base = "PASS";
       break;
+    case "review_stale":
+      base = "REV_STALE";
+      break;
     case "reviewed_fail":
       base = "FAIL";
       break;
@@ -160,12 +180,23 @@ function padRight(str, len) {
 export function formatAscii(graph) {
   const lines = [];
   const s = graph.summary;
+  const staleReviewsCount = Array.isArray(s.stale_review_phases)
+    ? s.stale_review_phases.length
+    : 0;
 
   lines.push(`Software Factory Tech-Tree — ${graph.project_name}`);
   lines.push(`Workspace: ${graph.workspace_root}`);
   lines.push(
-    `Core: ${s.core_completed}/${s.core_total} | Optional: ${s.optional_completed}/1 | Unlocked: ${s.unlocked_phases.length} | Stale: ${s.stale_phases.length} | Failing Reviews: ${s.failing_review_phases.length} | Invalid: ${s.invalid_phases.length}`
+    `Core: ${s.core_completed}/${s.core_total} | Optional: ${s.optional_completed}/1 | Unlocked: ${s.unlocked_phases.length} | Stale: ${s.stale_phases.length} | Stale Reviews: ${staleReviewsCount} | Failing Reviews: ${s.failing_review_phases.length} | Invalid: ${s.invalid_phases.length}`
   );
+  const topWarnings = Array.isArray(graph.warnings)
+    ? graph.warnings
+    : Array.isArray(s.warnings)
+      ? s.warnings
+      : [];
+  for (const w of topWarnings) {
+    lines.push(`! warning: ${w}`);
+  }
   lines.push("=".repeat(88));
 
   for (const node of graph.nodes) {
@@ -220,6 +251,7 @@ export function formatAscii(graph) {
     (n) =>
       n.status === "invalid" ||
       n.status === "reviewed_fail" ||
+      n.status === "review_stale" ||
       n.is_stale ||
       n.status === "unlocked" ||
       (n.status === "unreviewed" && n.phase !== "vision") ||
@@ -237,8 +269,12 @@ export function formatAscii(graph) {
   return lines.join("\n");
 }
 
-function workMermaidId(id) {
-  return "W_" + String(id).replace(/[^A-Za-z0-9_]/g, "_");
+export function workMermaidId(id) {
+  const encoded = Array.from(String(id ?? ""), (ch) => {
+    if (/^[A-Za-z0-9]$/.test(ch)) return ch;
+    return `_x${ch.codePointAt(0).toString(16)}_`;
+  }).join("");
+  return `W_${encoded}`;
 }
 
 function truncateLabel(text, maxLen = 42) {
@@ -370,10 +406,21 @@ export function formatWorkAscii(workGraph) {
     lines.push("Critical Path: none (no remaining uncompleted items)");
   }
 
-  if (Array.isArray(s.cycle_warnings) && s.cycle_warnings.length > 0) {
-    for (const warn of s.cycle_warnings) {
+  const cycleWarnings = Array.isArray(s.cycle_warnings) ? s.cycle_warnings : [];
+  if (cycleWarnings.length > 0) {
+    for (const warn of cycleWarnings) {
       lines.push(`! cycle warning: ${warn}`);
     }
+  }
+  const extraWarnings = (
+    Array.isArray(s.warnings)
+      ? s.warnings
+      : Array.isArray(workGraph.warnings)
+        ? workGraph.warnings
+        : []
+  ).filter((warn) => !cycleWarnings.includes(warn));
+  for (const warn of extraWarnings) {
+    lines.push(`! warning: ${warn}`);
   }
 
   lines.push("=".repeat(96));

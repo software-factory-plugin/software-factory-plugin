@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import path from "node:path";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
+import { assertNode20, isDirectRun } from "../../../lib/cli-utils.mjs";
 import { analyzeWorkspace } from "./analyzer.mjs";
 import {
   findDefaultWorkGraphPath,
@@ -17,6 +17,7 @@ import {
 
 const ALLOWED_VIEWS = new Set(["auto", "work", "pipeline"]);
 const DEFAULT_POLL_MS = 30000;
+const MIN_POLL_MS = 5000;
 
 function printHelp() {
   const usage = [
@@ -27,13 +28,13 @@ function printHelp() {
     "  --work-graph <path>          Path to canonical work-graph v1 JSON snapshot",
     "  --linear-project <id|slug|name>  Fetch live Linear project via LINEAR_API_KEY",
     "  --linear-team <key|name>     Fetch all Linear projects in a team via LINEAR_API_KEY",
-    "  --poll-ms <num>              Live Linear polling interval in ms (default: 30000, 0 disables)",
+    "  --poll-ms <num>              Live Linear polling interval in ms (default: 30000, >= 5000, or 0 to disable)",
     "  --view <auto|work|pipeline>  Select view mode (default: auto)",
     "  --json                       Output v1 Graph JSON (work or pipeline)",
     "  --mermaid                    Output color-coded Mermaid DAG",
     "  --ascii                      Output terminal ASCII tech-tree (default)",
     "  --serve                      Start live local HTTP + SSE tech-tree viewer",
-    "  --port <num>                 Port for --serve (default: 4173, auto-fallback)",
+    "  --port <num>                 Port for --serve (0..65535, default: 4173, auto-fallback)",
     "  --no-open                    Do not auto-open browser when using --serve",
     "  -h, --help                   Show this help message",
   ];
@@ -46,6 +47,34 @@ function readNextValue(argv, index, flag) {
     throw new Error(`Missing value for ${flag}`);
   }
   return next;
+}
+
+export function validatePort(rawValue) {
+  const str = String(rawValue ?? "").trim();
+  if (!/^\d+$/.test(str)) {
+    throw new Error(`Invalid numeric value for --port: ${JSON.stringify(rawValue)} (expected integer 0..65535)`);
+  }
+  const port = Number(str);
+  if (!Number.isSafeInteger(port) || port < 0 || port > 65535) {
+    throw new Error(`Invalid value for --port: ${port} (expected integer 0..65535)`);
+  }
+  return port;
+}
+
+export function validatePollMs(rawValue) {
+  const str = String(rawValue ?? "").trim();
+  if (!/^\d+$/.test(str)) {
+    throw new Error(
+      `Invalid numeric value for --poll-ms: ${JSON.stringify(rawValue)} (expected 0 to disable or finite integer >= ${MIN_POLL_MS})`
+    );
+  }
+  const ms = Number(str);
+  if (!Number.isSafeInteger(ms) || (ms !== 0 && ms < MIN_POLL_MS)) {
+    throw new Error(
+      `Invalid value for --poll-ms: ${ms} (expected 0 to disable or finite integer >= ${MIN_POLL_MS})`
+    );
+  }
+  return ms;
 }
 
 export function parseArgs(argv) {
@@ -98,18 +127,10 @@ export function parseArgs(argv) {
       if (!val) throw new Error("Missing value for --linear-team");
       opts.linearTeam = val;
     } else if (arg === "--poll-ms") {
-      const next = argv[i + 1];
-      if (!next || !/^\d+$/.test(next)) {
-        throw new Error("Invalid numeric value for --poll-ms");
-      }
-      opts.pollMs = Number(next);
+      opts.pollMs = validatePollMs(argv[i + 1]);
       i += 1;
     } else if (arg.startsWith("--poll-ms=")) {
-      const val = arg.slice("--poll-ms=".length);
-      if (!val || !/^\d+$/.test(val)) {
-        throw new Error("Invalid numeric value for --poll-ms");
-      }
-      opts.pollMs = Number(val);
+      opts.pollMs = validatePollMs(arg.slice("--poll-ms=".length));
     } else if (arg === "--view") {
       const val = readNextValue(argv, i, "--view").toLowerCase();
       if (!ALLOWED_VIEWS.has(val)) {
@@ -138,18 +159,10 @@ export function parseArgs(argv) {
     } else if (arg === "--no-open") {
       opts.noOpen = true;
     } else if (arg === "--port") {
-      const next = argv[i + 1];
-      if (!next || !/^\d+$/.test(next)) {
-        throw new Error("Invalid numeric value for --port");
-      }
-      opts.port = Number(next);
+      opts.port = validatePort(argv[i + 1]);
       i += 1;
     } else if (arg.startsWith("--port=")) {
-      const val = arg.slice("--port=".length);
-      if (!val || !/^\d+$/.test(val)) {
-        throw new Error("Invalid numeric value for --port");
-      }
-      opts.port = Number(val);
+      opts.port = validatePort(arg.slice("--port=".length));
     } else {
       throw new Error(`Unknown option: ${arg}`);
     }
@@ -162,6 +175,8 @@ export function parseArgs(argv) {
 }
 
 async function main() {
+  assertNode20();
+
   let opts;
   try {
     opts = parseArgs(process.argv.slice(2));
@@ -245,11 +260,7 @@ async function main() {
   }
 }
 
-const isDirectRun =
-  process.argv[1] &&
-  path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
-
-if (isDirectRun) {
+if (isDirectRun(import.meta.url)) {
   main().catch((err) => {
     process.stderr.write(`Error: ${err.message}\n`);
     process.exit(1);

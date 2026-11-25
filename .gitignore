@@ -1,2 +1,16 @@
 # macOS
 .DS_Store
+
+# Dependencies & local tooling
+node_modules/
+
+# Secrets & local environment
+.env
+.env.*
+
+# Logs
+*.log
+
+# Generated factory artifacts & standalone previews (never commit into plugin repo)
+docs/factory/
+preview.html

@@ -7,6 +7,9 @@
 //                                      Bundle into one self-contained offline preview.html (zero runtime needed)
 import fs from 'node:fs';
 import path from 'node:path';
+import { parseArgs } from 'node:util';
+import { assertNode20, isDirectRun } from '../../../lib/cli-utils.mjs';
+import { installGracefulShutdown } from '../../../lib/http-sse.mjs';
 import { serve } from './server.mjs';
 import { checkProject } from './check.mjs';
 import { exportProject } from './export.mjs';
@@ -31,27 +34,47 @@ function fail(message) {
 }
 
 function parse(argv) {
-  const opts = { args: [] };
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === '--port' || a === '-p') opts.port = argv[++i];
-    else if (a.startsWith('--port=')) opts.port = a.slice(7);
-    else if (a === '--out' || a === '-o') opts.out = argv[++i];
-    else if (a.startsWith('--out=')) opts.out = a.slice(6);
-    else if (a === '--title') opts.title = argv[++i];
-    else if (a.startsWith('--title=')) opts.title = a.slice(8);
-    else if (a === '--dev') opts.dev = true;
-    else if (a === '--json') opts.json = true;
-    else if (a === '--help' || a === '-h') opts.help = true;
-    else if (a.startsWith('-')) fail(`unknown option ${a}\n\n${USAGE}`);
-    else opts.args.push(a);
+  let parsed;
+  try {
+    parsed = parseArgs({
+      args: argv,
+      allowPositionals: true,
+      strict: true,
+      options: {
+        port: { type: 'string', short: 'p' },
+        out: { type: 'string', short: 'o' },
+        title: { type: 'string' },
+        dev: { type: 'boolean', default: false },
+        json: { type: 'boolean', default: false },
+        help: { type: 'boolean', short: 'h', default: false },
+      },
+    });
+  } catch (err) {
+    fail(`${err.message}\n\n${USAGE}`);
   }
-  if (opts.port !== undefined) {
-    opts.port = Number(opts.port);
-    if (!Number.isInteger(opts.port) || opts.port < 1 || opts.port > 65535) {
+
+  const { values, positionals } = parsed;
+  const opts = {
+    args: positionals,
+    out: values.out,
+    title: values.title,
+    dev: Boolean(values.dev),
+    json: Boolean(values.json),
+    help: Boolean(values.help),
+  };
+
+  if (values.port !== undefined) {
+    const rawPort = values.port.trim();
+    if (!/^\d+$/.test(rawPort)) {
       fail('--port needs an integer between 1 and 65535');
     }
+    const p = Number(rawPort);
+    if (!Number.isInteger(p) || p < 1 || p > 65535) {
+      fail('--port needs an integer between 1 and 65535');
+    }
+    opts.port = p;
   }
+
   return opts;
 }
 
@@ -104,31 +127,41 @@ async function runServe(dir, { port, dev } = {}) {
   if (!fs.existsSync(path.join(root, 'flow.json'))) {
     fail(`no flow.json in ${root}`);
   }
+  const envPort = process.env.PORT ? Number(process.env.PORT) : undefined;
+  const resolvedPort = port ?? (Number.isInteger(envPort) && envPort >= 1 && envPort <= 65535 ? envPort : 5180);
   try {
-    const { url, name } = await serve({
+    const { url, name, close } = await serve({
       root,
-      port: port ?? (Number(process.env.PORT) || 5180),
+      port: resolvedPort,
       strictPort: port !== undefined,
       dev,
     });
+    installGracefulShutdown(close);
     console.log(`Mockery: ${name} at ${url}`);
     console.log(`Watching ${root}`);
   } catch (err) {
-    fail(err.code === 'EADDRINUSE' ? `port ${port} is already in use` : err.message);
+    fail(err.code === 'EADDRINUSE' ? `port ${resolvedPort} is already in use` : err.message);
   }
 }
 
-const opts = parse(process.argv.slice(2));
-const cmd = opts.args[0];
+async function main() {
+  assertNode20();
+  const opts = parse(process.argv.slice(2));
+  const cmd = opts.args[0];
 
-if (opts.help) {
-  console.log(USAGE);
-} else if (cmd === 'check') {
-  runCheck(opts.args[1], opts);
-} else if (cmd === 'export') {
-  runExport(opts.args[1], opts);
-} else if (cmd === 'serve') {
-  await runServe(opts.args[1], opts);
-} else {
-  await runServe(cmd, opts);
+  if (opts.help) {
+    console.log(USAGE);
+  } else if (cmd === 'check') {
+    runCheck(opts.args[1], opts);
+  } else if (cmd === 'export') {
+    runExport(opts.args[1], opts);
+  } else if (cmd === 'serve') {
+    await runServe(opts.args[1], opts);
+  } else {
+    await runServe(cmd, opts);
+  }
+}
+
+if (isDirectRun(import.meta.url)) {
+  await main();
 }

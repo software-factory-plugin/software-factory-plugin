@@ -19,19 +19,128 @@ const ALLOWED_STATUS_TYPES = new Set([
 ]);
 
 /**
- * Sanitize external URLs strictly to http: / https:.
+ * Sanitize external URLs strictly to https:.
  */
 export function sanitizeHttpUrl(raw) {
   if (typeof raw !== "string" || !raw.trim()) return null;
   try {
     const parsed = new URL(raw.trim());
-    if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+    if (parsed.protocol === "https:") {
       return parsed.href;
     }
   } catch {
     return null;
   }
   return null;
+}
+
+class MinRankHeap {
+  constructor(rankOf) {
+    this.rankOf = rankOf;
+    this.data = [];
+  }
+
+  get size() {
+    return this.data.length;
+  }
+
+  push(id) {
+    const arr = this.data;
+    arr.push(id);
+    let i = arr.length - 1;
+    while (i > 0) {
+      const parent = (i - 1) >> 1;
+      if (this.rankOf(arr[parent]) <= this.rankOf(arr[i])) break;
+      [arr[parent], arr[i]] = [arr[i], arr[parent]];
+      i = parent;
+    }
+  }
+
+  pop() {
+    const arr = this.data;
+    if (arr.length === 0) return null;
+    const top = arr[0];
+    const last = arr.pop();
+    if (arr.length > 0) {
+      arr[0] = last;
+      let i = 0;
+      while (true) {
+        const left = i * 2 + 1;
+        const right = left + 1;
+        let smallest = i;
+        if (left < arr.length && this.rankOf(arr[left]) < this.rankOf(arr[smallest])) {
+          smallest = left;
+        }
+        if (right < arr.length && this.rankOf(arr[right]) < this.rankOf(arr[smallest])) {
+          smallest = right;
+        }
+        if (smallest === i) break;
+        [arr[i], arr[smallest]] = [arr[smallest], arr[i]];
+        i = smallest;
+      }
+    }
+    return top;
+  }
+}
+
+function findStronglyConnectedComponents(nodeIds, getNeighbors) {
+  let nextIndex = 0;
+  const indexMap = new Map();
+  const lowlinkMap = new Map();
+  const onStack = new Set();
+  const tarjanStack = [];
+  const sccs = [];
+
+  for (const startId of nodeIds) {
+    if (indexMap.has(startId)) continue;
+    const callStack = [{ id: startId, neighbors: null, nextIdx: 0 }];
+    while (callStack.length > 0) {
+      const frame = callStack[callStack.length - 1];
+      const v = frame.id;
+      if (frame.neighbors === null) {
+        indexMap.set(v, nextIndex);
+        lowlinkMap.set(v, nextIndex);
+        nextIndex += 1;
+        tarjanStack.push(v);
+        onStack.add(v);
+        frame.neighbors = getNeighbors(v);
+      }
+
+      if (frame.nextIdx < frame.neighbors.length) {
+        const w = frame.neighbors[frame.nextIdx];
+        frame.nextIdx += 1;
+        if (!indexMap.has(w)) {
+          callStack.push({ id: w, neighbors: null, nextIdx: 0 });
+        } else if (onStack.has(w)) {
+          const wIdx = indexMap.get(w);
+          if (wIdx < lowlinkMap.get(v)) {
+            lowlinkMap.set(v, wIdx);
+          }
+        }
+      } else {
+        callStack.pop();
+        if (callStack.length > 0) {
+          const parent = callStack[callStack.length - 1].id;
+          const vLow = lowlinkMap.get(v);
+          if (vLow < lowlinkMap.get(parent)) {
+            lowlinkMap.set(parent, vLow);
+          }
+        }
+        if (lowlinkMap.get(v) === indexMap.get(v)) {
+          const component = [];
+          while (true) {
+            const w = tarjanStack.pop();
+            onStack.delete(w);
+            component.push(w);
+            if (w === v) break;
+          }
+          sccs.push(component);
+        }
+      }
+    }
+  }
+
+  return sccs;
 }
 
 /**
@@ -287,11 +396,17 @@ export function analyzeWorkGraph(input, { defaultSourceKind = "local_file" } = {
   const itemById = new Map();
   const rawBlockedByMap = new Map();
   const rawBlocksMap = new Map();
+  const duplicateWarnings = [];
 
   for (const raw of input.items) {
     if (!raw || typeof raw !== "object") continue;
     const id = typeof raw.id === "string" ? raw.id.trim() : "";
     if (!id) continue;
+    if (itemById.has(id)) {
+      const msg = `Duplicate work item ID "${id}" ignored (kept first occurrence)`;
+      if (!duplicateWarnings.includes(msg)) duplicateWarnings.push(msg);
+      continue;
+    }
 
     const statusName =
       typeof raw.status_name === "string" && raw.status_name.trim()
@@ -412,10 +527,15 @@ export function analyzeWorkGraph(input, { defaultSourceKind = "local_file" } = {
 
   // Deterministic tie-break comparator for ordering items
   function compareItemsDeterministic(a, b) {
-    const projA = a.project_id ? projectMap.get(a.project_id)?.name || a.project_id : "~";
-    const projB = b.project_id ? projectMap.get(b.project_id)?.name || b.project_id : "~";
-    const pCmp = projA.localeCompare(projB, "en", { sensitivity: "base" });
-    if (pCmp !== 0) return pCmp;
+    const hasProjA = Boolean(a.project_id);
+    const hasProjB = Boolean(b.project_id);
+    if (hasProjA !== hasProjB) return hasProjA ? -1 : 1;
+    if (hasProjA && hasProjB) {
+      const projA = projectMap.get(a.project_id)?.name || a.project_id;
+      const projB = projectMap.get(b.project_id)?.name || b.project_id;
+      const pCmp = projA.localeCompare(projB, "en", { sensitivity: "base" });
+      if (pCmp !== 0) return pCmp;
+    }
 
     const msA = a.milestone_id ? milestoneMap.get(a.milestone_id)?.sort_order ?? 9999 : 9999;
     const msB = b.milestone_id ? milestoneMap.get(b.milestone_id)?.sort_order ?? 9999 : 9999;
@@ -454,10 +574,18 @@ export function analyzeWorkGraph(input, { defaultSourceKind = "local_file" } = {
     }
   }
 
-  // Kahn's topological sort with deterministic cycle breaking
+  // Kahn's topological sort with O((V + E) log V) ready heap and Tarjan SCC cycle breaking
   const inDegree = new Map();
+  const readyHeap = new MinRankHeap((id) => detRank.get(id));
+  const queued = new Set();
+
   for (const item of allItems) {
-    inDegree.set(item.id, item.blocked_by.length);
+    const deg = item.blocked_by.length;
+    inDegree.set(item.id, deg);
+    if (deg === 0) {
+      readyHeap.push(item.id);
+      queued.add(item.id);
+    }
   }
 
   const placed = new Set();
@@ -465,41 +593,84 @@ export function analyzeWorkGraph(input, { defaultSourceKind = "local_file" } = {
   const brokenEdgeKeys = new Set();
   const tierMap = new Map();
 
-  function getReadyQueue() {
-    const ready = [];
-    for (const item of allItems) {
-      if (!placed.has(item.id) && inDegree.get(item.id) === 0) {
-        ready.push(item.id);
-      }
-    }
-    return ready;
-  }
-
   while (placed.size < allItems.length) {
-    let queue = getReadyQueue();
+    if (readyHeap.size === 0) {
+      // Dependency cycle detected: run Tarjan's SCC over unplaced subgraph and break
+      // only intra-SCC incoming edges of the lowest-detRank node in a source cycle SCC.
+      const unplacedIds = allItems
+        .filter((it) => !placed.has(it.id))
+        .map((it) => it.id);
+      const getActiveNeighbors = (uid) => {
+        const node = itemById.get(uid);
+        const out = [];
+        for (const cid of node.blocks) {
+          if (!placed.has(cid) && !brokenEdgeKeys.has(`${uid}\u0000${cid}`)) {
+            out.push(cid);
+          }
+        }
+        return out;
+      };
 
-    if (queue.length === 0) {
-      // Dependency cycle detected: choose remaining node with lowest in-degree (tie-break deterministically)
-      const remaining = allItems.filter((it) => !placed.has(it.id));
-      remaining.sort((a, b) => {
-        const dDiff = inDegree.get(a.id) - inDegree.get(b.id);
-        return dDiff !== 0 ? dDiff : detRank.get(a.id) - detRank.get(b.id);
-      });
-      const chosen = remaining[0];
-      const unplacedBlockers = chosen.blocked_by.filter((bid) => !placed.has(bid));
-      for (const bid of unplacedBlockers) {
-        brokenEdgeKeys.add(`${bid}\u0000${chosen.id}`);
+      const sccs = findStronglyConnectedComponents(unplacedIds, getActiveNeighbors);
+      const sccOf = new Map();
+      for (let idx = 0; idx < sccs.length; idx += 1) {
+        for (const nid of sccs[idx]) {
+          sccOf.set(nid, idx);
+        }
+      }
+
+      const sccHasIncoming = new Array(sccs.length).fill(false);
+      for (const uid of unplacedIds) {
+        const fromScc = sccOf.get(uid);
+        for (const cid of getActiveNeighbors(uid)) {
+          const toScc = sccOf.get(cid);
+          if (fromScc !== toScc) {
+            sccHasIncoming[toScc] = true;
+          }
+        }
+      }
+
+      let chosenId = null;
+      let chosenSccIndex = -1;
+      for (let idx = 0; idx < sccs.length; idx += 1) {
+        if (sccHasIncoming[idx] || sccs[idx].length <= 1) continue;
+        for (const nid of sccs[idx]) {
+          if (chosenId === null || detRank.get(nid) < detRank.get(chosenId)) {
+            chosenId = nid;
+            chosenSccIndex = idx;
+          }
+        }
+      }
+
+      if (chosenId === null) {
+        // Defensive fallback if an unexpected degenerate state occurs
+        chosenId = unplacedIds[0];
+        chosenSccIndex = sccOf.get(chosenId);
+      }
+
+      const chosenSccSet = new Set(sccs[chosenSccIndex]);
+      const chosenItem = itemById.get(chosenId);
+      let remainingDeg = inDegree.get(chosenId);
+      for (const bid of chosenItem.blocked_by) {
+        if (placed.has(bid)) continue;
+        const edgeKey = `${bid}\u0000${chosenId}`;
+        if (brokenEdgeKeys.has(edgeKey)) continue;
+        if (!chosenSccSet.has(bid)) continue;
+        brokenEdgeKeys.add(edgeKey);
+        remainingDeg = Math.max(0, remainingDeg - 1);
         cycleWarnings.push(
-          `Dependency cycle detected: broke back-edge ${bid} -> ${chosen.id} for topological layout`
+          `Dependency cycle detected: broke back-edge ${bid} -> ${chosenId} for topological layout`
         );
       }
-      inDegree.set(chosen.id, 0);
-      queue = [chosen.id];
+      inDegree.set(chosenId, remainingDeg);
+      if (remainingDeg === 0 && !queued.has(chosenId)) {
+        readyHeap.push(chosenId);
+        queued.add(chosenId);
+      }
     }
 
-    // Pop first item in deterministic rank order
-    queue.sort((a, b) => detRank.get(a) - detRank.get(b));
-    const currentId = queue[0];
+    const currentId = readyHeap.pop();
+    if (currentId === null || placed.has(currentId)) continue;
     placed.add(currentId);
     topoOrder.push(currentId);
 
@@ -519,7 +690,12 @@ export function analyzeWorkGraph(input, { defaultSourceKind = "local_file" } = {
     for (const childId of currentItem.blocks) {
       if (placed.has(childId)) continue;
       if (brokenEdgeKeys.has(`${currentId}\u0000${childId}`)) continue;
-      inDegree.set(childId, Math.max(0, inDegree.get(childId) - 1));
+      const nextDeg = Math.max(0, inDegree.get(childId) - 1);
+      inDegree.set(childId, nextDeg);
+      if (nextDeg === 0 && !queued.has(childId)) {
+        readyHeap.push(childId);
+        queued.add(childId);
+      }
     }
   }
 
@@ -620,6 +796,20 @@ export function analyzeWorkGraph(input, { defaultSourceKind = "local_file" } = {
     return nameCmp !== 0 ? nameCmp : compareNaturalId(a.id, b.id);
   });
 
+  const criticalPathPoints = criticalPathIds.reduce((acc, id) => {
+    const it = itemById.get(id);
+    const pts =
+      it &&
+      typeof it.estimate === "number" &&
+      Number.isFinite(it.estimate) &&
+      it.estimate > 0
+        ? it.estimate
+        : 0;
+    return acc + pts;
+  }, 0);
+
+  const warnings = [...duplicateWarnings, ...cycleWarnings];
+
   // Summary counts & points
   const summary = {
     total: sortedItems.length,
@@ -634,8 +824,10 @@ export function analyzeWorkGraph(input, { defaultSourceKind = "local_file" } = {
     remaining_points: 0,
     ready_ids: [],
     critical_path_ids: criticalPathIds,
-    critical_path_points: maxCpWeight,
+    critical_path_points: criticalPathPoints,
+    critical_path_weight: maxCpWeight,
     cycle_warnings: cycleWarnings,
+    warnings,
   };
 
   for (const item of sortedItems) {
@@ -664,6 +856,7 @@ export function analyzeWorkGraph(input, { defaultSourceKind = "local_file" } = {
     projects,
     milestones,
     summary,
+    warnings,
     items: sortedItems,
     edges,
   };

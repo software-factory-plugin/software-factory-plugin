@@ -1,8 +1,8 @@
 # Software Factory — Operator Prompting Guide
 
-A practical handbook for running the 12 **Software Factory** skills (`sf-vision` through `sf-specs`, `sf-mockery`, `sf-review`, `sf-tree`, and `sf-telemetry`) across **Antigravity**, **Claude Code**, and **Gemini CLI**.
+A practical handbook for running the 12 **Software Factory** skills (`sf-vision` through `sf-specs`, `sf-mockery`, `sf-review`, `sf-tree`, and `sf-telemetry`) across **Antigravity**, **Claude Code**, **OpenAI Codex**, and **Gemini CLI**.
 
-> **Zero Idle Token Overhead:** This handbook lives under `docs/` for human operators and is never loaded into the agent's idle router context.
+> **Zero Always-On Rules/Hooks Overhead (Router-Only Metadata):** This handbook lives under `docs/` for human operators and is never loaded into the agent's idle router context.
 
 ---
 
@@ -28,7 +28,7 @@ Every Software Factory project follows a simple, human-validated cadence:
 
 ### Built-In Prompt Quality Gate (All 12 Skills)
 
-You do **not** have to memorize every high-signal template above. Every Software Factory skill includes a context-aware, behind-the-scenes **Prompt Quality Gate** (zero idle token overhead; identical across Antigravity, Claude Code, Codex, and Gemini CLI):
+You do **not** have to memorize every high-signal template above. Every Software Factory skill includes a context-aware, behind-the-scenes **Prompt Quality Gate** (zero always-on rules/hooks overhead—loaded only when the skill activates; identical across Antigravity, Claude Code, OpenAI Codex, and Gemini CLI):
 
 - **Silent When Clear:** Downstream skills resolve `docs/factory/` upstream `<system_state>` blocks first. Concise prompts like *"Run `sf-prd`"* pass silently when upstream files already make execution unambiguous. Targeted revisions to an existing artifact or `sf-review` blocking-issue fixes also bypass the gate automatically.
 - **1-Turn Coaching When Weak or Ambiguous:** If your prompt plus resolved upstream state still leaves stage-critical ambiguities (e.g., a one-line `sf-vision` idea with no user/constraints/exclusions, an `sf-brd` prompt with no monetization or budget hints, or a vague `sf-review` / `sf-tree` scope), the skill pauses before generating and shows:
@@ -47,7 +47,7 @@ You do **not** have to memorize every high-signal template above. Every Software
 > *"Run `sf-vision` for `<Project Name>`. Primary user: `<who>`. UX tone: `<e.g., minimalist, high-contrast, utilitarian>`. Hard constraints: `<budget, stack, latency, privacy rules>`. Explicitly out of scope for v1: `<list 3+ exclusions>`."*
 
 ### Stage 2 — `sf-market-research` (`docs/factory/02-market-research.md`)
-> *"Run `sf-market-research` against `docs/factory/01-vision.md`. Benchmark 3–5 real competitors, pricing models, and macro risks, and state clearly whether our market gap is Validated or Pivot Required."*
+> *"Run `sf-market-research` against `docs/factory/01-vision.md`. Benchmark 3–5 real competitors, pricing models, and macro risks, and state clearly whether our market gap is Proceed or Pivot Required."*
 
 ### Stage 3 — `sf-brd` (`docs/factory/03-brd.md`)
 > *"Run `sf-brd` using `01-vision.md` and `02-market-research.md`. Define monetization tiers, 3 measurable KPIs, compliance constraints, and our 6-week MVP budget/timeline."*
@@ -118,17 +118,19 @@ When `sf-telemetry` flags `SPLIT_REQUIRED` (`8 pts`) or `scope_blowup` (`felt / 
 ## 5. Cross-Harness Tips
 
 - **Antigravity:** Supports all 12 skills natively via `plugin.json`, inline `sf-tree` snapshots, and opening `http://127.0.0.1:4173` directly in the built-in browser pane.
-- **Claude Code:** Loads `.claude-plugin/plugin.json` + `skills/`. Run `sf-tree` and `sf-telemetry` scripts directly with Node.js 20+ (`--ascii`, `--mermaid`, `--json`, or `--serve`).
+- **Claude Code:** Loads `.claude-plugin/plugin.json` + `.claude-plugin/marketplace.json` + `skills/`. Run `sf-tree`, `sf-mockery`, and `sf-telemetry` scripts directly with Node.js 20+ (`--ascii`, `--mermaid`, `--json`, or `--serve`).
+- **OpenAI Codex:** Loads `.codex-plugin/plugin.json` + `.agents/plugins/marketplace.json` + shared `skills/`. Supports all 12 skills and Node.js 20+ CLI workflows identically, with graceful pure-markdown fallback whenever Node 20+ is absent.
 - **Gemini CLI:** Links via `gemini-extension.json` (`gemini extensions link .`). Identical CLI behavior across all bundled Node.js 20+ scripts, with graceful pure-markdown fallback whenever Node 20+ is absent.
 
 ---
 
-## 6. Running the Automated Eval Suite
+## 6. Running the Automated Eval & Test Suites
 
-Contributors and operators can verify all 12 skills, golden PulseBoard `<system_state>` fixtures, Missing-Input Guards, `sf-review` vectors, and idle-router token budgets offline with zero npm dependencies:
+Contributors and operators can verify all 12 skills, golden PulseBoard `<system_state>` fixtures, Missing-Input Guards, `sf-review` vectors, idle-router token budgets, and Node.js 20+ unit/security tests offline with zero npm dependencies:
 
 ```bash
 node evals/run.mjs --ascii
 node evals/run.mjs --markdown
 node evals/run.mjs --json
+node --test tests/*.test.mjs
 ```

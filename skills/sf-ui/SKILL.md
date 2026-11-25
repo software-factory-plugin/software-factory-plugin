@@ -13,11 +13,12 @@ description: >-
 ## Inputs & Handoff Gate
 
 - **Required Inputs:**
-  - `sf-vision` `<system_state>`: `ux_tone`, `hard_constraints`, `explicitly_out_of_scope` (plus `compliance_requirements` and `budget_or_timeline_constraints` when present).
+  - `sf-vision` `<system_state>`: `ux_tone`, `hard_constraints`, `explicitly_out_of_scope`.
   - `sf-ux` `<system_state>`: `screens_required`, `primary_navigation_pattern`, `key_interactions`, `accessibility_requirements`.
-- **Input Resolution Order:** Locate required upstream `<system_state>` blocks in this order before triggering the Missing-Input Guard: (1) files or text explicitly provided in the user prompt, (2) earlier turns in the current conversation, (3) canonical workspace files `docs/factory/01-vision.md` and `docs/factory/05-ux.md` (plus `docs/factory/03-brd.md` when present, if working in a repository).
+  - Optional `sf-brd` (`docs/factory/03-brd.md`) `<system_state>` (inherit whenever present): `monetization_model`, `core_kpis`, `compliance_requirements`, `budget_or_timeline_constraints`.
+- **Input Resolution Order:** Locate required upstream `<system_state>` blocks in this order before triggering the Missing-Input Guard: (1) files or text explicitly provided in the user prompt, (2) earlier turns in the current conversation, (3) canonical workspace files `docs/factory/01-vision.md` and `docs/factory/05-ux.md` (plus optional `docs/factory/03-brd.md` when present, if working in a repository).
 - **Missing-Input Guard:** If either required upstream `<system_state>` block is missing or contains invalid JSON, STOP immediately and ask the user to provide it (or offer to run `sf-vision` / `sf-ux` first). Never guess or invent upstream requirements.
-- **Strict Constraint Inheritance:** Adhere strictly to upstream `hard_constraints` and `explicitly_out_of_scope` (as well as `compliance_requirements` and `budget_or_timeline_constraints` when present). Do not introduce out-of-scope features, unapproved libraries, or prohibited visual complexity.
+- **Strict Constraint Inheritance:** Adhere strictly to `sf-vision` `hard_constraints` and `explicitly_out_of_scope`, plus `sf-brd` (`03-brd.md`) `compliance_requirements` and `budget_or_timeline_constraints` when present. Do not introduce out-of-scope features, unapproved libraries, or prohibited visual complexity.
 - **Stage Boundaries & Gates:** Define CSS/Tailwind-compatible design tokens and component styling aligned with `ux_tone`. Verify color contrast and focus/interaction styling meet `accessibility_requirements`. Do NOT add/remove screens or alter UX flows.
 - **Prompt Quality Gate (Context-Aware):** Run after resolving `01-vision.md` and `05-ux.md` (exempt targeted revisions of `06-ui.md` or `sf-review` fixes):
   - *High-Signal Check:* If `01-vision.md` + `05-ux.md` resolve cleanly and no anti-pattern is triggered, concise prompts (e.g., *"Run `sf-ui`"*) pass silently. Pause only if brand palette constraints, light/dark theme preference, or CSS framework preference is critically ambiguous relative to `ux_tone`, or an anti-pattern is hit.
@@ -36,9 +37,14 @@ description: >-
 
 Produce an **80/20 hybrid artifact**: 80% concise, human-readable visual specification and 20% strict machine-readable state. Use these exact Markdown headings in order:
 
-- `### 1. Visual Identity & Tone` — Aesthetic direction, brand mood, and rationale tied directly to `ux_tone`.
-- `### 2. Design Tokens` — Concrete hex codes, font families, spacing scale, border-radius rules, and CSS/Tailwind framework recommendation.
-- `### 3. Component Styling` — Visual specs and interaction/focus states for buttons, inputs, cards, and navigation elements.
+### 1. Visual Identity & Tone
+Aesthetic direction, brand mood, and rationale tied directly to `ux_tone`.
+
+### 2. Design Tokens
+Concrete hex codes, font families, spacing scale, border-radius rules, and CSS/Tailwind framework recommendation.
+
+### 3. Component Styling
+Visual specs and interaction/focus states for buttons, inputs, cards, and navigation elements.
 
 Place strict, valid JSON directly inside `<system_state>...</system_state>` (no markdown code fences, comments, or trailing commas).
 

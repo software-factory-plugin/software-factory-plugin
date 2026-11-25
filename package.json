@@ -1,0 +1,14 @@
+{
+  "name": "software-factory-plugin",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "eval": "node evals/run.mjs --ascii",
+    "version:check": "node scripts/bump-version.mjs --check",
+    "check": "npm run version:check && npm run eval && npm test"
+  }
+}

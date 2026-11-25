@@ -17,7 +17,7 @@ description: >-
   - `sf-brd` `<system_state>`: `monetization_model`, `core_kpis`, `compliance_requirements`, `budget_or_timeline_constraints`.
 - **Input Resolution Order:** Locate required upstream `<system_state>` blocks in this order before triggering the Missing-Input Guard: (1) files or text explicitly provided in the user prompt, (2) earlier turns in the current conversation, (3) canonical workspace files `docs/factory/01-vision.md` and `docs/factory/03-brd.md` (if working in a repository).
 - **Missing-Input Guard:** If any required upstream `<system_state>` block is missing or contains invalid JSON, **STOP** immediately and ask the user to provide it (or offer to run `sf-vision` or `sf-brd` first). Never guess or invent upstream requirements.
-- **Strict Constraint Inheritance:** Strictly enforce upstream `hard_constraints` and `explicitly_out_of_scope` (plus `compliance_requirements` and `budget_or_timeline_constraints` when present). Reject or omit any flow, rule, or integration that violates them.
+- **Strict Constraint Inheritance:** Strictly enforce upstream `sf-vision` `hard_constraints` and `explicitly_out_of_scope`, plus `sf-brd` (`03-brd.md`) `compliance_requirements` and `budget_or_timeline_constraints`. Reject or omit any flow, rule, or integration that violates them.
 - **Stage Boundaries & Gates:**
   - **In scope:** Core user flows, compliance-mapped software rules, integrations directly implied by the BRD, and at least 3 critical edge cases with fallback behavior.
   - **Out of scope:** UI screens, wireframes, visual layouts, or selecting databases, frameworks, or cloud infrastructure.

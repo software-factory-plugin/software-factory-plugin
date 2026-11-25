@@ -79,7 +79,7 @@ export function runAllEvals({ repoRoot = DEFAULT_REPO_ROOT, suite = "all" } = {}
   };
 }
 
-function formatAscii(report) {
+export function formatAscii(report) {
   const lines = [
     `Software Factory Eval Suite — ${report.ok ? "PASS" : "FAIL"} (${report.summary.passed}/${report.summary.total} checks passed)`,
     "=".repeat(84),
@@ -102,7 +102,7 @@ function formatAscii(report) {
   return lines.join("\n");
 }
 
-function formatMarkdown(report) {
+export function formatMarkdown(report) {
   const lines = [
     `# Software Factory Eval Report — ${report.ok ? "PASS" : "FAIL"}`,
     "",
@@ -115,6 +115,20 @@ function formatMarkdown(report) {
     lines.push(
       `| \`${s.suite}\` | ${s.failed === 0 ? "PASS" : "FAIL"} | ${s.passed} | ${s.total} |`
     );
+  }
+  const failing = [];
+  for (const s of report.suites) {
+    for (const c of s.checks || []) {
+      if (!c.passed) {
+        failing.push({ suite: s.suite, id: c.id, detail: c.detail });
+      }
+    }
+  }
+  if (failing.length > 0) {
+    lines.push("", "## Failures", "");
+    for (const f of failing) {
+      lines.push(`- \`[${f.suite}] ${f.id}\`: ${f.detail}`);
+    }
   }
   const tokSuite = report.suites.find((s) => s.suite === "tokens");
   if (tokSuite?.metrics) {
