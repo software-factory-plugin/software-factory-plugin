@@ -151,7 +151,7 @@ agy plugin validate --strict /path/to/software-factory-plugin
 agy plugin install /path/to/software-factory-plugin
 
 # Or install a pinned version from GitHub
-agy plugin install https://github.com/software-factory-plugin/software-factory-plugin/tree/v0.9.0
+agy plugin install https://github.com/software-factory-plugin/software-factory-plugin/tree/v1.0.0
 ```
 
 Alternatively, register the local directory in `~/.gemini/config/plugins.json` (global) or `.agents/plugins.json` (workspace):
@@ -191,7 +191,7 @@ Keep `version` synchronized across all plugin and marketplace manifests (`plugin
 
 ```bash
 # Sync all 6 plugin/marketplace manifests and README.md
-node scripts/bump-version.mjs 0.9.1
+node scripts/bump-version.mjs 1.0.0
 
 # Verify version parity, unit tests, evals, and strict plugin validation
 node scripts/bump-version.mjs --check
@@ -200,19 +200,7 @@ node evals/run.mjs --ascii
 agy plugin validate --strict .
 ```
 
-Then commit and push a matching annotated Git tag and GitHub Release (for example, `v0.9.1`).
-
-## Roadmap
-
-Active roadmap planning, design specs, and issue tracking live in [Linear (`SOF`)](https://linear.app/software-factory-plugin):
-
-- **Mockery Integration (Shipped — `v0.2.0` / `v0.9.0`):** Optional `sf-mockery` bridge skill connecting interactive Mockery flow canvases into UX/UI, `sf-review`, and `sf-architecture`, backed by a bundled zero-dependency Node.js 22+ runtime (`check`, `serve`, standalone single-file `export`).
-- **Live Project & Tech-Tree View (Shipped — `v0.3.0` / `v0.4.0`):** Dual-mode read-only `sf-tree` skill and zero-dep Node 22+ DAG analyzer/live SSE web viewer covering both Work-Item / Linear Dependency Tech-Trees (topological tiers, ready vs. blocked work, Critical Path) and 01–08 Pipeline Stages (staleness blast radius, `sf-review` gates, `review_stale` freshness, Mockery parity).
-- **Agile Sizing & Token/Cost Telemetry (Shipped — `v0.5.0`):** On-demand `sf-telemetry` skill and zero-dep Node 22+ CLI pairing Fibonacci sizing (`1, 2, 3, 5, 8`) with v2 non-overlapping token buckets, offline token/cost pricing, Linear bootstrap & streaming transcript parsers, hashed out-of-repo JSONL storage, and calibration/blowup reports.
-- **Prompting Guide & Evals (Shipped — `v0.6.0`):** Comprehensive operator handbook (`docs/PROMPTING_GUIDE.md`) plus zero-dep Node 22+ automated eval suite (`evals/run.mjs`, golden PulseBoard fixtures, 4 suites, GitHub Actions CI) verifying frontmatter, `<system_state>` fidelity, Missing-Input Guards, `sf-review` vectors, and idle-router token budgets.
-- **Marketplace Publishing (Shipped — `v0.7.0` / `v0.7.1`):** MIT `LICENSE`, minimal SVG logo (`assets/logo.svg`), cross-harness manifests and marketplace registries (Antigravity, Claude Code, OpenAI Codex, Gemini CLI), release version-sync automation, community templates, and zero-warning strict validation.
-- **Built-In Prompt Quality Gate (Shipped — `v0.8.0`):** Context-aware prompt evaluation embedded across all 12 skills with 1-turn gap diagnosis, placeholder-based High-Signal Prompt suggestions, targeted follow-ups, soft override/upfront bypass support with **Assumptions Used** transparency, and automated contract evals (`156/156` checks).
-- **Security, Modularity & Contract Hardening (Shipped — `v0.9.0`+):** Shared zero-dep `lib/` primitives (`cli-utils`, `fs-safe`, `http-sse`), strict `<system_state>` validation, `sf-telemetry` v2 schema & lockfile hardening, modular `sf-tree` UI, comprehensive `node --test` suites, and tightened skill contracts & router token budgets.
+Then commit and push a matching annotated Git tag and GitHub Release (for example, `v1.0.0`).
 
 ## License
 

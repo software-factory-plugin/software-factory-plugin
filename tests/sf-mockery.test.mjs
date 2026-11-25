@@ -313,22 +313,37 @@ test("sf-mockery export: deterministic, SHA-256 CSP, vm.Script valid viewer JS, 
       </main>`
     );
     fs.writeFileSync(
+      path.join(tmp, "screens", "second.html"),
+      `<main><img src="/assets/logo.svg" /></main>`
+    );
+    fs.writeFileSync(
       path.join(tmp, "flow.json"),
       JSON.stringify({
         title: "ExportTest",
-        nodes: [{ id: "home", title: "Home", w: 1200, h: 800, x: 0, y: 0 }],
+        nodes: [
+          { id: "home", title: "Home", w: 1200, h: 800, x: 0, y: 0 },
+          { id: "second", title: "Second", w: 1200, h: 800, x: 1400, y: 0 },
+        ],
         edges: [],
       })
     );
 
     const out1 = path.join(tmp, "preview-1.html");
     const out2 = path.join(tmp, "preview-2.html");
-    exportProject(tmp, { outFile: out1 });
+    const res1 = exportProject(tmp, { outFile: out1 });
     exportProject(tmp, { outFile: out2 });
 
     const html1 = fs.readFileSync(out1, "utf8");
     const html2 = fs.readFileSync(out2, "utf8");
     assert.equal(html1, html2, "Repeated exports must be byte-for-byte deterministic");
+    assert.equal(res1.summary.assets, 1);
+    assert.ok(res1.summary.assetBytes > 0);
+
+    // Must enforce maxAssetBytes cap cleanly
+    assert.throws(
+      () => exportProject(tmp, { outFile: out1, maxAssetBytes: 5 }),
+      /maxAssetBytes/
+    );
 
     // Must not embed symlinked outside secret (neither via assets nor screens)
     assert.equal(html1.includes(Buffer.from("TOP_SECRET_BYTES").toString("base64")), false);
@@ -350,18 +365,46 @@ test("sf-mockery export: deterministic, SHA-256 CSP, vm.Script valid viewer JS, 
       assert.ok(csp.includes(`'sha256-${digest}'`), `CSP must include sha256 hash for inline script`);
     }
 
-    // Verify bundle JSON escapes HTML5 breakout tokens and preserves external/fragment URLs
+    // Verify bundle JSON escapes HTML5 breakout tokens and deduplicates assets (stored ONCE in bundle.assets)
     const bundleMatch = scripts[0].match(/window\.__MOCKERY_BUNDLE__\s*=\s*([\s\S]+);$/);
     assert.ok(bundleMatch);
     assert.equal(scripts[0].includes("<!--"), false, "escScriptJson must escape < as \\u003c");
     assert.equal(scripts[0].includes("<script"), false, "escScriptJson must escape <script");
     assert.ok(scripts[0].includes("\\u003c") && scripts[0].includes("\\u003e"));
     const bundle = JSON.parse(bundleMatch[1]);
-    assert.ok(bundle.files["screens/home.html"].includes("https://cdn.example.com/assets/logo.svg"));
-    assert.ok(bundle.files["screens/home.html"].includes("/assets/logo.svg#icon-check"));
-    assert.ok(bundle.files["screens/home.html"].includes("data:image/svg+xml;base64,"));
-    assert.equal(bundle.files["screens/home.html"].includes('src="../assets/logo.svg"'), false);
-    assert.ok(bundle.files["kit.css"].includes("data:image/svg+xml;base64,"));
+    assert.equal(bundle.version, 2);
+    const logoUri = bundle.assets["assets/logo.svg"];
+    assert.ok(logoUri && logoUri.startsWith("data:image/svg+xml;base64,"));
+    assert.equal(
+      html1.split(logoUri).length - 1,
+      1,
+      "Each local asset data URI must appear exactly once in exported HTML (deduplicated)"
+    );
+    assert.equal(bundle.files["screens/home.html"].includes("data:image/svg+xml;base64,"), false);
+    assert.equal(bundle.files["kit.css"].includes("data:image/svg+xml;base64,"), false);
+
+    // Verify runtime resolveBundledAssetRefs resolves local refs while preserving external URLs & #fragments
+    const screensSrc = fs.readFileSync(
+      path.join(REPO_ROOT, "skills", "sf-mockery", "scripts", "viewer", "screens.js"),
+      "utf8"
+    );
+    const assetSandbox = {
+      CSSStyleSheet: class { replaceSync() {} },
+      window: { __MOCKERY_BUNDLE__: bundle },
+      document: {},
+      console,
+    };
+    vm.runInNewContext(
+      `${screensSrc.replace(/^\s*export\s+/gm, "")}\nthis.__resolve = resolveBundledAssetRefs;`,
+      assetSandbox
+    );
+    const resolvedHome = assetSandbox.__resolve(bundle.files["screens/home.html"], bundle.assets);
+    const resolvedKit = assetSandbox.__resolve(bundle.files["kit.css"], bundle.assets);
+    assert.ok(resolvedHome.includes("https://cdn.example.com/assets/logo.svg"));
+    assert.ok(resolvedHome.includes("/assets/logo.svg#icon-check"));
+    assert.ok(resolvedHome.includes(`src="${logoUri}"`));
+    assert.equal(resolvedHome.includes('src="../assets/logo.svg"'), false);
+    assert.ok(resolvedKit.includes(`url("${logoUri}")`));
 
     // Reject writing --out inside protected subdirectories
     assert.throws(() => exportProject(tmp, { outFile: path.join(tmp, "screens", "evil.html") }));

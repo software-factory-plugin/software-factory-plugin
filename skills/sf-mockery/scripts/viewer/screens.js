@@ -1,5 +1,6 @@
 // Screens: fetch screen + component files (or read from an embedded standalone bundle),
-// expand <x-include>, sanitize HTML fragments, and own the shared stylesheet adopted by every shadow root.
+// expand <x-include>, resolve deduplicated bundled assets, sanitize HTML fragments,
+// and own the shared stylesheet adopted by every shadow root.
 
 const STYLE_FILES = ['tokens.css', 'kit.css'];
 const DISALLOWED_TAGS = new Set([
@@ -31,6 +32,36 @@ const escScreen = (s) =>
       default: return c;
     }
   });
+
+export function resolveBundledAssetRefs(text, assets = window.__MOCKERY_BUNDLE__?.assets) {
+  if (!text || !assets || typeof assets !== 'object') return text;
+
+  const resolveAsset = (rawRel, suffix = '') => {
+    if (suffix && suffix.includes('#')) return null; // preserve SVG/HTML #fragment references
+    const normalized = rawRel.replace(/^(?:(?:\.\.\/)+|\.\/|\/)/, '');
+    return Object.prototype.hasOwnProperty.call(assets, normalized) ? assets[normalized] : null;
+  };
+
+  // 1. CSS url(...) references (quoted or unquoted), anchored at url(...) boundary
+  let out = String(text).replace(
+    /url\(\s*(["']?)((?:(?:\.\.\/)+|\.\/|\/)?assets\/[^"'()\s<>#?]+)([?#][^"'()\s<>]*)?\1\s*\)/gi,
+    (match, quote, rawRel, suffix) => {
+      const uri = resolveAsset(rawRel, suffix);
+      return uri ? `url(${quote}${uri}${quote})` : match;
+    },
+  );
+
+  // 2. HTML quoted attribute values (e.g. src="/assets/logo.png", href="../assets/pic.webp")
+  out = out.replace(
+    /(=\s*)(["'])((?:(?:\.\.\/)+|\.\/|\/)?assets\/[^"'<>#?\s]+)([?#][^"'<>\s]*)?\2/gi,
+    (match, eq, quote, rawRel, suffix) => {
+      const uri = resolveAsset(rawRel, suffix);
+      return uri ? `${eq}${quote}${uri}${quote}` : match;
+    },
+  );
+
+  return out;
+}
 
 function isSafeUrl(value) {
   const normalized = String(value ?? '')
@@ -71,11 +102,25 @@ function sanitizeNodeTree(root) {
   }
 }
 
-export function sanitizeHtmlFragment(html) {
+function parseInertContainer(html) {
+  if (typeof DOMParser === 'function') {
+    const doc = new DOMParser().parseFromString(
+      `<!doctype html><html><head></head><body>${String(html ?? '')}</body></html>`,
+      'text/html',
+    );
+    if (doc && doc.body) {
+      return { root: doc.body, readHtml: () => doc.body.innerHTML };
+    }
+  }
   const tpl = document.createElement('template');
   tpl.innerHTML = String(html ?? '');
-  sanitizeNodeTree(tpl.content);
-  return tpl.innerHTML;
+  return { root: tpl.content, readHtml: () => tpl.innerHTML };
+}
+
+export function sanitizeHtmlFragment(html) {
+  const { root, readHtml } = parseInertContainer(html);
+  sanitizeNodeTree(root);
+  return readHtml();
 }
 
 function makeErrorCard(message) {
@@ -89,7 +134,9 @@ async function fetchText(path) {
   const bundle = window.__MOCKERY_BUNDLE__;
   if (bundle?.files) {
     const key = String(path || '').replace(/^\/+/, '');
-    if (Object.prototype.hasOwnProperty.call(bundle.files, key)) return bundle.files[key];
+    if (Object.prototype.hasOwnProperty.call(bundle.files, key)) {
+      return resolveBundledAssetRefs(bundle.files[key], bundle.assets);
+    }
     throw new Error(`404 ${key}`);
   }
   const res = await fetch(`/${path}`, { cache: 'no-store' });
@@ -111,10 +158,23 @@ function cached(map, key, path) {
 export const isSharedStyle = (path) => STYLE_FILES.includes(path);
 
 export async function loadSharedStyles() {
-  const parts = await Promise.all(STYLE_FILES.map((f) => fetchText(f).catch(() => '')));
+  const [parts, fontsPart] = await Promise.all([
+    Promise.all(STYLE_FILES.map((f) => fetchText(f).catch(() => ''))),
+    window.__MOCKERY_BUNDLE__ ? fetchText('fonts.css').catch(() => '') : Promise.resolve(''),
+  ]);
   const cleaned = parts.map((css) => css.replace(/^\s*@charset\s+[^;]+;\s*/gim, ''));
   // Adopted sheets cascade after a screen's own <style>; a layer lets screen styles win instead.
   sharedSheet.replaceSync(`@layer shared {\n${cleaned.join('\n')}\n}`);
+
+  if (window.__MOCKERY_BUNDLE__ && fontsPart) {
+    let styleEl = document.getElementById('mockery-bundled-fonts');
+    if (!styleEl) {
+      styleEl = document.createElement('style');
+      styleEl.id = 'mockery-bundled-fonts';
+      document.head.appendChild(styleEl);
+    }
+    styleEl.textContent = fontsPart.replace(/^\s*@charset\s+[^;]+;\s*/gim, '');
+  }
 }
 
 // Forget a cached file. Returns the component name for components/*.html paths.
@@ -137,9 +197,8 @@ function fill(template, el) {
 // Replace top-level <x-include src="name"> with components/name.html, with cycle detection and nested expansion.
 async function expand(html, deps, depth = 0, includeStack = new Set()) {
   if (!/<x-include\b/i.test(html) || depth > 8) return html;
-  const tpl = document.createElement('template');
-  tpl.innerHTML = html;
-  const includes = [...tpl.content.querySelectorAll('x-include')].filter((el) => !el.parentElement?.closest('x-include'));
+  const { root, readHtml } = parseInertContainer(html);
+  const includes = [...root.querySelectorAll('x-include')].filter((el) => !el.parentElement?.closest('x-include'));
   if (includes.length === 0) return html;
   await Promise.all(includes.map(async (el) => {
     const name = el.getAttribute('src');
@@ -163,11 +222,15 @@ async function expand(html, deps, depth = 0, includeStack = new Set()) {
     const nextStack = new Set(includeStack);
     nextStack.add(name);
     const expandedChild = await expand(fill(part, el), deps, depth + 1, nextStack);
-    const out = document.createElement('template');
-    out.innerHTML = expandedChild;
-    el.replaceWith(out.content);
+    const parsedChild = parseInertContainer(expandedChild);
+    const ownerDoc = root.ownerDocument || document;
+    const frag = ownerDoc.createDocumentFragment();
+    while (parsedChild.root.firstChild) {
+      frag.appendChild(ownerDoc.adoptNode ? ownerDoc.adoptNode(parsedChild.root.firstChild) : parsedChild.root.firstChild);
+    }
+    el.replaceWith(frag);
   }));
-  return tpl.innerHTML;
+  return readHtml();
 }
 
 function lint(file, html) {
