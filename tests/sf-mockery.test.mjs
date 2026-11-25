@@ -119,7 +119,7 @@ test("sf-mockery check: balanced <x-include> scanner handles nested slots, case-
 
   assert.equal(errors.length, 0);
   assert.ok(expanded.includes("</header>"), "Outer </header> must not be deleted");
-  assert.ok(expanded.includes("</div>\n</header>"), "Topbar inner </div> before </header> must remain");
+  assert.match(expanded, /<\/div>\r?\n<\/header>/, "Topbar inner </div> before </header> must remain");
   assert.equal(expanded.includes("</x-include>"), false);
 
   const report = checkProject(PULSEBOARD_MOCKUPS);
