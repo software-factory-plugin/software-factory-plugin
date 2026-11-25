@@ -217,7 +217,9 @@ async function launchBrowser(chromeBin) {
         if (val) return true;
         await new Promise((r) => setTimeout(r, 80));
       }
-      throw new Error(`Timed out waiting for: ${predicateExpr}`);
+      throw new Error(
+        `Timed out waiting for: ${predicateExpr}\npageErrors=${JSON.stringify(pageErrors)}\ncspErrors=${JSON.stringify(cspErrors)}\nconsoleErrors=${JSON.stringify(consoleErrors)}`
+      );
     }
 
     async function close() {
@@ -234,7 +236,10 @@ async function launchBrowser(chromeBin) {
 
   async function close() {
     try {
-      await send("Browser.close");
+      await Promise.race([
+        send("Browser.close"),
+        new Promise((r) => setTimeout(r, 2000)),
+      ]);
     } catch {
       // ignore
     }

@@ -14,7 +14,8 @@ const SCRIPTS_ROOT = path.dirname(fileURLToPath(import.meta.url));
 const VIEWER_DIR = path.join(SCRIPTS_ROOT, 'viewer');
 const DEFAULT_MAX_ASSET_BYTES = 20 * 1024 * 1024; // 20 MB total raw asset cap
 
-const escStyle = (css) => String(css).replace(/<\/style/gi, '<\\/style');
+const normalizeLf = (s) => String(s ?? '').replace(/\r\n?/g, '\n');
+const escStyle = (css) => normalizeLf(css).replace(/<\/style/gi, '<\\/style');
 const escScriptJson = (obj) =>
   JSON.stringify(obj)
     .replace(/</g, '\\u003c')
@@ -24,7 +25,7 @@ const escScriptJson = (obj) =>
     .replace(/\u2029/g, '\\u2029');
 
 const sha256Csp = (content) =>
-  `'sha256-${crypto.createHash('sha256').update(content, 'utf8').digest('base64')}'`;
+  `'sha256-${crypto.createHash('sha256').update(normalizeLf(content), 'utf8').digest('base64')}'`;
 
 const sortEntries = (entries) =>
   entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
@@ -95,7 +96,7 @@ function collectHtmlDir(absRoot, subdir) {
 }
 
 function stripModuleSyntax(src) {
-  return src
+  return normalizeLf(src)
     .replace(/^\s*import\s+[\s\S]*?from\s+['"][^'"]+['"];?\s*$/gm, '')
     .replace(/^\s*export\s+(?=(?:async\s+)?(?:function|const|let|var|class)\b)/gm, '');
 }
@@ -235,7 +236,7 @@ export function exportProject(
     "form-action 'none'",
   ].join('; ');
 
-  const shellHtml = fs.readFileSync(path.join(VIEWER_DIR, 'index.html'), 'utf8');
+  const shellHtml = normalizeLf(fs.readFileSync(path.join(VIEWER_DIR, 'index.html'), 'utf8'));
   const inlineStyles = [
     `  <meta http-equiv="Content-Security-Policy" content="${escHtml(exportCsp)}">`,
     `  <style>\n${escStyle(viewerCss)}\n  </style>`,

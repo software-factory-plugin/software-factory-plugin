@@ -228,6 +228,9 @@ export async function serve({ root, port = 5180, strictPort = false, dev = false
         return;
       }
       server.close(() => resolve());
+      if (typeof server.closeAllConnections === 'function') {
+        server.closeAllConnections();
+      }
     });
   };
 

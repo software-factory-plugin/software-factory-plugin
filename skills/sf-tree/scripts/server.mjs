@@ -839,7 +839,14 @@ export async function createLiveServer({
     }
     sseHub.close();
     return new Promise((resolve) => {
+      if (!server.listening) {
+        resolve();
+        return;
+      }
       server.close(() => resolve());
+      if (typeof server.closeAllConnections === "function") {
+        server.closeAllConnections();
+      }
     });
   }
 
