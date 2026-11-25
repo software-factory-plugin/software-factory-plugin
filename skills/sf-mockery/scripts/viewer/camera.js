@@ -16,6 +16,7 @@ function safeWriteStorage(key, value) {
 export function createCamera(viewport, world, { storeKey, onChange, onTap }) {
   const cam = { x: 0, y: 0, s: 1 };
   let raf = 0, anim = 0, settleTimer = 0, saveTimer = 0;
+  let pendingResizeObserver = null;
 
   function render() {
     raf = 0;
@@ -34,11 +35,13 @@ export function createCamera(viewport, world, { storeKey, onChange, onTap }) {
   }
 
   function set(x, y, s) {
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(s) || !(s > 0)) return;
     cam.x = x; cam.y = y; cam.s = clampScale(s);
     raf ||= requestAnimationFrame(render);
   }
 
   function zoomAt(cx, cy, s) {
+    if (!Number.isFinite(s) || !(s > 0)) return;
     const k = clampScale(s) / cam.s;
     set(cx - (cx - cam.x) * k, cy - (cy - cam.y) * k, cam.s * k);
   }
@@ -55,6 +58,10 @@ export function createCamera(viewport, world, { storeKey, onChange, onTap }) {
   // Interpolate the world-space center linearly and the scale geometrically.
   function animateTo(t, ms = 320) {
     stop();
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) {
+      set(t.x, t.y, t.s);
+      return;
+    }
     const [w, h] = size();
     const from = { cx: (w / 2 - cam.x) / cam.s, cy: (h / 2 - cam.y) / cam.s, ls: Math.log(cam.s) };
     const to = { cx: (w / 2 - t.x) / t.s, cy: (h / 2 - t.y) / t.s, ls: Math.log(t.s) };
@@ -70,15 +77,33 @@ export function createCamera(viewport, world, { storeKey, onChange, onTap }) {
   }
 
   function fit(r, opts = {}) {
+    if (!r || !(r.w > 0) || !(r.h > 0) || !Number.isFinite(r.x) || !Number.isFinite(r.y)) return;
     const { pad = 48, animate = true, maxScale = 1 } = opts;
     const [w, h] = size();
-    if (!w || !h) { // not laid out yet (e.g. a tab opened hidden): fit once it has a size
-      const ro = new ResizeObserver(() => { if (viewport.clientWidth && viewport.clientHeight) { ro.disconnect(); fit(r, opts); } });
-      ro.observe(viewport);
+    if (!(w > 0) || !(h > 0)) { // not laid out yet (e.g. a tab opened hidden): fit once it has a size
+      if (pendingResizeObserver) {
+        pendingResizeObserver.disconnect();
+        pendingResizeObserver = null;
+      }
+      if (typeof ResizeObserver === 'function') {
+        const ro = new ResizeObserver(() => {
+          if (viewport.clientWidth > 0 && viewport.clientHeight > 0) {
+            ro.disconnect();
+            if (pendingResizeObserver === ro) pendingResizeObserver = null;
+            fit(r, opts);
+          }
+        });
+        pendingResizeObserver = ro;
+        ro.observe(viewport);
+      }
       return;
     }
-    const s = clampScale(Math.min((w - pad * 2) / r.w, (h - pad * 2) / r.h, maxScale));
+    const availW = Math.max(1, w - pad * 2);
+    const availH = Math.max(1, h - pad * 2);
+    const s = clampScale(Math.min(availW / r.w, availH / r.h, maxScale));
+    if (!Number.isFinite(s) || !(s > 0)) return;
     const target = { x: w / 2 - (r.x + r.w / 2) * s, y: h / 2 - (r.y + r.h / 2) * s, s };
+    if (!Number.isFinite(target.x) || !Number.isFinite(target.y)) return;
     if (animate) animateTo(target);
     else { stop(); set(target.x, target.y, target.s); }
   }
@@ -87,7 +112,10 @@ export function createCamera(viewport, world, { storeKey, onChange, onTap }) {
     try {
       const raw = safeReadStorage(storeKey);
       const c = raw ? JSON.parse(raw) : null;
-      if (c && Number.isFinite(c.x) && Number.isFinite(c.y) && c.s > 0) { set(c.x, c.y, c.s); return true; }
+      if (c && Number.isFinite(c.x) && Number.isFinite(c.y) && Number.isFinite(c.s) && c.s > 0) {
+        set(c.x, c.y, c.s);
+        return true;
+      }
     } catch { /* ignore corrupt state */ }
     return false;
   }
@@ -125,7 +153,7 @@ export function createCamera(viewport, world, { storeKey, onChange, onTap }) {
     if (!drag.moved) {
       if (Math.hypot(dx, dy) < 4) return;
       drag.moved = true;
-      viewport.setPointerCapture(e.pointerId);
+      try { viewport.setPointerCapture(e.pointerId); } catch { /* ignore synthetic/detached pointers */ }
       viewport.classList.add('is-panning');
     }
     set(drag.cx + dx, drag.cy + dy, cam.s);
@@ -138,6 +166,7 @@ export function createCamera(viewport, world, { storeKey, onChange, onTap }) {
   };
   viewport.addEventListener('pointerup', end);
   viewport.addEventListener('pointercancel', end);
+  viewport.addEventListener('lostpointercapture', end);
   addEventListener('resize', () => set(cam.x, cam.y, cam.s));
 
   return {

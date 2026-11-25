@@ -10,7 +10,7 @@
   "interface": {
     "displayName": "Software Factory",
     "shortDescription": "12-skill DAG software pipeline with strict <system_state> handoffs, Red Team review, sf-tree, and sf-telemetry.",
-    "longDescription": "Lightweight Directed Acyclic Graph (DAG) suite of 12 on-demand skills (sf-vision through sf-specs, optional sf-mockery prototypes, universal sf-review Red Team auditor, dual-mode sf-tree Work-Item & Pipeline tech-tree viewer, and sf-telemetry Agile Sizing & Token/Cost calibration) with zero idle token overhead and Node.js 20+ stdlib-only scripts.",
+    "longDescription": "Lightweight Directed Acyclic Graph (DAG) suite of 12 on-demand skills (sf-vision through sf-specs, optional sf-mockery prototypes, universal sf-review Red Team auditor, dual-mode sf-tree Work-Item & Pipeline tech-tree viewer, and sf-telemetry Agile Sizing & Token/Cost calibration) with zero always-on rules/hooks overhead (router-only metadata) and Node.js 22+ stdlib-only scripts.",
     "developerName": "jamesconant",
     "category": "Developer Tools",
     "capabilities": [

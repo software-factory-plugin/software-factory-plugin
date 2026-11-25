@@ -1,10 +1,24 @@
 # PulseBoard — Product Requirements Document
 
-Defines core workflows for creating HTTP endpoint monitors, confirming consecutive probe failures to prevent alert noise, publishing public status pages, and delivering signed Slack/webhook notifications.
+### 1. Core User Flows
 
-## Core Flows & Edge Cases
+- Create and configure an HTTP monitor with check interval and expected status code.
+- Evaluate consecutive health checks and transition incident state automatically.
+- Publish a real-time public status page displaying 90-day uptime bars.
+- Deliver signed Slack and generic HTTPS JSON webhook alerts on state transitions.
 
-Every monitor requires two consecutive failed checks before transitioning from `operational` to `degraded` or `outage`, preventing single-packet blips from paging teams.
+### 2. Applied Business Logic & Rules
+
+- Every monitor requires two consecutive failed checks before transitioning from `operational` to `degraded` or `outage`, preventing single-packet blips from paging teams.
+- Sign all outbound webhook payloads with HMAC-SHA256.
+- Enforce zero third-party scripts on public status page routes.
+- Required integrations: Slack Incoming Webhooks and Generic HTTPS JSON Webhooks.
+
+### 3. Critical Edge Cases
+
+- **Unresponsive or private probe targets:** Enforce a strict 10-second probe timeout and SSRF private-IP blocklist.
+- **Transient webhook failures:** Retry failed webhook deliveries up to 3 times with exponential backoff and log delivery status.
+- **Database pool saturation:** Serve cached public status snapshots and display a non-destructive retry banner in the admin dashboard when PostgreSQL connections are exhausted.
 
 <system_state>
 {
@@ -26,7 +40,8 @@ Every monitor requires two consecutive failed checks before transitioning from `
   ],
   "edge_case_mitigations": [
     "Enforce 10-second probe timeout and SSRF private-IP blocklist",
-    "Exponential backoff with 3 retries on failed webhook delivery"
+    "Exponential backoff with 3 retries on failed webhook delivery",
+    "Serve cached public status snapshot and admin retry banner when PostgreSQL pool saturates"
   ]
 }
 </system_state>

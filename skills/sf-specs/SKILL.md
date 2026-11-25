@@ -16,9 +16,10 @@ description: >-
   - `sf-prd` `<system_state>`: `core_flows`, `business_rules`, `edge_case_mitigations`
   - `sf-architecture` `<system_state>`: `frontend_stack`, `backend_stack`, `database_type`, `data_models`, `core_endpoints`
   - `sf-vision` `<system_state>`: `hard_constraints`, `explicitly_out_of_scope`
-- **Input Resolution Order:** Locate required upstream `<system_state>` blocks in this order before triggering the Missing-Input Guard: (1) files or text explicitly provided in the user prompt, (2) earlier turns in the current conversation, (3) canonical workspace files `docs/factory/01-vision.md`, `docs/factory/04-prd.md`, and `docs/factory/07-architecture.md` (plus `docs/factory/03-brd.md` when present, if working in a repository).
+  - Optional `sf-brd` (`docs/factory/03-brd.md`) `<system_state>` (inherit whenever present): `monetization_model`, `core_kpis`, `compliance_requirements`, `budget_or_timeline_constraints`
+- **Input Resolution Order:** Locate required upstream `<system_state>` blocks in this order before triggering the Missing-Input Guard: (1) files or text explicitly provided in the user prompt, (2) earlier turns in the current conversation, (3) canonical workspace files `docs/factory/01-vision.md`, `docs/factory/04-prd.md`, and `docs/factory/07-architecture.md` (plus optional `docs/factory/03-brd.md` when present, if working in a repository).
 - **Missing-Input Guard:** If any required upstream `<system_state>` block is missing or contains invalid JSON, STOP immediately and ask the user to provide it (or offer to run the missing upstream skill first). Never guess or invent upstream requirements.
-- **Strict Constraint Inheritance:** All API contracts, test cases, and guardrails MUST strictly adhere to upstream `hard_constraints` and `explicitly_out_of_scope` (plus `compliance_requirements` and `budget_or_timeline_constraints` when present).
+- **Strict Constraint Inheritance:** All API contracts, test cases, and guardrails MUST strictly adhere to `sf-vision` `hard_constraints` and `explicitly_out_of_scope`, plus `sf-brd` (`03-brd.md`) `compliance_requirements` and `budget_or_timeline_constraints` when present.
 - **Stage Boundaries & Gates:**
   - Write strict pre-implementation API contracts, unit/E2E test case definitions, and linting/security guardrails for an implementation agent or swarm to satisfy.
   - Do NOT write application implementation code or invent endpoints absent from `sf-architecture`.
@@ -30,7 +31,7 @@ description: >-
 
 ## Execution Steps
 
-1. **Validate Upstream State:** Parse `sf-prd`, `sf-architecture`, and `sf-vision` `<system_state>` blocks; lock in `hard_constraints`, `explicitly_out_of_scope`, and any `compliance_requirements` or `budget_or_timeline_constraints`.
+1. **Validate Upstream State:** Parse `sf-prd`, `sf-architecture`, and `sf-vision` `<system_state>` blocks (plus optional `03-brd.md` when present); lock in `sf-vision` `hard_constraints` and `explicitly_out_of_scope`, and any `sf-brd` `compliance_requirements` or `budget_or_timeline_constraints`.
 2. **Author API Contracts:** Define strict JSON Schema / OpenAPI contracts (methods, paths, auth headers, request/response payloads, status codes, and error shapes) for every endpoint in `core_endpoints` using `data_models`.
 3. **Define Unit & E2E Tests:** Specify exact unit test cases (covering `business_rules` and `edge_case_mitigations`) and E2E test cases (covering `core_flows`) with explicit preconditions, inputs, and assertions for the Verifier agent.
 4. **Establish Execution Guardrails:** Define linting rules, static-analysis thresholds, allowed/prohibited libraries, and security checks tailored to `frontend_stack`, `backend_stack`, and `database_type`.
@@ -40,17 +41,17 @@ description: >-
 
 Structure the artifact as ~80% human-readable narrative and ~20% machine-readable `<system_state>` JSON. Include these exact Markdown headings in order:
 
-- `### 1. API Contracts`
-  - Request/response schemas, status codes, and error payloads mapped 1:1 to `core_endpoints` and `data_models`.
-  - Explicitly exclude any endpoint or capability absent from `sf-architecture`.
+### 1. API Contracts
+- Request/response schemas, status codes, and error payloads mapped 1:1 to `core_endpoints` and `data_models`.
+- Explicitly exclude any endpoint or capability absent from `sf-architecture`.
 
-- `### 2. Test Suite Definition`
-  - Unit tests covering `business_rules` and `edge_case_mitigations` with deterministic inputs and assertions.
-  - E2E tests covering `core_flows` with preconditions, steps, and pass/fail criteria for the Verifier agent.
+### 2. Test Suite Definition
+- Unit tests covering `business_rules` and `edge_case_mitigations` with deterministic inputs and assertions.
+- E2E tests covering `core_flows` with preconditions, steps, and pass/fail criteria for the Verifier agent.
 
-- `### 3. Execution Guardrails`
-  - Stack-specific linting standards, type/static-analysis gates, and allowed/disallowed libraries.
-  - Security checks and constraint enforcement derived from `hard_constraints` and `compliance_requirements`.
+### 3. Execution Guardrails
+- Stack-specific linting standards, type/static-analysis gates, and allowed/disallowed libraries.
+- Security checks and constraint enforcement derived from `hard_constraints` and (when present in `03-brd.md`) `compliance_requirements`.
 
 Place strict, valid JSON directly inside `<system_state>...</system_state>` (no markdown code fences, comments, or trailing commas).
 

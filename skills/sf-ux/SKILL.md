@@ -15,10 +15,10 @@ Translate the PRD into structural user flows, navigation hierarchy, and screen l
 - **Required Inputs:**
   - `sf-prd` `<system_state>`: `core_flows`, `business_rules`, `edge_case_mitigations`.
   - `sf-vision` `<system_state>`: `primary_user`, `hard_constraints`, `explicitly_out_of_scope`.
-  - Optional upstream constraints (inherit whenever present): `compliance_requirements`, `budget_or_timeline_constraints`.
-- **Input Resolution Order:** Locate required upstream `<system_state>` blocks in this order before triggering the Missing-Input Guard: (1) files or text explicitly provided in the user prompt, (2) earlier turns in the current conversation, (3) canonical workspace files `docs/factory/01-vision.md` and `docs/factory/04-prd.md` (plus `docs/factory/03-brd.md` when present, if working in a repository).
+  - Optional `sf-brd` (`docs/factory/03-brd.md`) `<system_state>` (inherit whenever present): `monetization_model`, `core_kpis`, `compliance_requirements`, `budget_or_timeline_constraints`.
+- **Input Resolution Order:** Locate required upstream `<system_state>` blocks in this order before triggering the Missing-Input Guard: (1) files or text explicitly provided in the user prompt, (2) earlier turns in the current conversation, (3) canonical workspace files `docs/factory/01-vision.md` and `docs/factory/04-prd.md` (plus optional `docs/factory/03-brd.md` when present, if working in a repository).
 - **Missing-Input Guard:** If any required upstream `<system_state>` block is missing or contains invalid JSON, STOP immediately and ask the user to provide it (or offer to run `sf-vision` / `sf-prd` first). Never guess or invent upstream requirements.
-- **Strict Constraint Inheritance:** Every screen, navigation path, and interaction must strictly honor upstream `hard_constraints` and `explicitly_out_of_scope` (plus `compliance_requirements` and `budget_or_timeline_constraints` when present).
+- **Strict Constraint Inheritance:** Every screen, navigation path, and interaction must strictly honor `sf-vision` `hard_constraints` and `explicitly_out_of_scope`, plus `sf-brd` (`03-brd.md`) `compliance_requirements` and `budget_or_timeline_constraints` when present.
 - **Stage Boundaries & Gates:** Focus strictly on usability, friction reduction, information architecture, structural ASCII/descriptive wireframes, interaction behaviors, and accessibility requirements. Do NOT select colors, typography, or CSS frameworks (leave to `sf-ui`), and do NOT invent features absent from the PRD.
 - **Prompt Quality Gate (Context-Aware):** Run after resolving `01-vision.md` and `04-prd.md` (exempt targeted revisions of `05-ux.md` or `sf-review` fixes):
   - *High-Signal Check:* If `01-vision.md` + `04-prd.md` resolve cleanly and no anti-pattern is triggered, concise prompts (e.g., *"Run `sf-ux`"*) pass silently. Pause only if target surface/form-factor (e.g., desktop vs. mobile-first), navigation density, or WCAG/accessibility level is critically ambiguous for the PRD flows, or an anti-pattern is hit.
@@ -28,7 +28,7 @@ Translate the PRD into structural user flows, navigation hierarchy, and screen l
 
 ## Execution Steps
 
-1. **Validate Inputs & Constraints:** Parse `sf-prd` and `sf-vision` `<system_state>` blocks (stopping on missing/invalid JSON) and list active `hard_constraints`, `explicitly_out_of_scope`, `compliance_requirements`, and `budget_or_timeline_constraints`.
+1. **Validate Inputs & Constraints:** Parse `sf-prd` and `sf-vision` `<system_state>` blocks (stopping on missing/invalid JSON), plus optional `03-brd.md` when present, and list active `hard_constraints`, `explicitly_out_of_scope`, `compliance_requirements`, and `budget_or_timeline_constraints`.
 2. **Map Flows to Information Architecture:** Map every PRD `core_flows` step, `business_rules` gate, and `edge_case_mitigations` state (empty, loading, validation, error) to distinct screens or modal states under a clear `primary_navigation_pattern`.
 3. **Draft Structural Wireframes:** Create ASCII or descriptive component layouts (Header, Sidebar/Nav, Main Content Zone, Actions) for each required screen, staying purely structural with zero visual tokens.
 4. **Define Interactions & Accessibility:** Specify concrete interaction behaviors (e.g., click vs. swipe, pagination vs. infinite scroll, inline validation, focus management) and enforceable accessibility requirements (keyboard navigation, semantic landmarks, ARIA/screen-reader support, compliance targets).
@@ -37,12 +37,14 @@ Translate the PRD into structural user flows, navigation hierarchy, and screen l
 
 Produce **80% human-readable narrative** followed by **20% machine-readable state**. Require these exact Markdown headings in order:
 
-- `### 1. Information Architecture`
-  High-level map of screens, modal states, and navigation hierarchy.
-- `### 2. Core User Journeys`
-  Step-by-step UI interactions completing each PRD `core_flows` path and `edge_case_mitigations` state.
-- `### 3. Screen Wireframes`
-  ASCII or descriptive layout of structural components (Header, Sidebar, Main Content Zone, Actions), interaction notes, and per-screen accessibility requirements.
+### 1. Information Architecture
+High-level map of screens, modal states, and navigation hierarchy.
+
+### 2. Core User Journeys
+Step-by-step UI interactions completing each PRD `core_flows` path and `edge_case_mitigations` state.
+
+### 3. Screen Wireframes
+ASCII or descriptive layout of structural components (Header, Sidebar, Main Content Zone, Actions), interaction notes, and per-screen accessibility requirements.
 
 Place strict, valid JSON directly inside `<system_state>...</system_state>` (no markdown code fences, comments, or trailing commas).
 

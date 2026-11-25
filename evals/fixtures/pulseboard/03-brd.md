@@ -1,10 +1,19 @@
 # PulseBoard — Business Requirements Document
 
-PulseBoard operates on an open-core model: MIT self-hosted single container plus a flat \$19/month hosted team plan with zero per-seat surcharges.
+### 1. Value Proposition & Monetization
 
-## KPIs & Compliance
+PulseBoard operates on an open-core model: MIT self-hosted single container plus a flat $19/month hosted team plan with zero per-seat surcharges.
 
-Primary KPIs track Time-to-First-Monitor (< 5 minutes), alert false-positive rate (< 1%), and 99.95% status page availability. GDPR compliance is simplified by zero third-party cookies or analytics trackers.
+### 2. Success Metrics (KPIs)
+
+- Time-to-First-Monitor under 5 minutes.
+- False-positive alert rate under 1%.
+- Public status page availability >= 99.95%.
+
+### 3. Compliance & Operational Constraints
+
+- GDPR privacy-by-default enforced by zero third-party tracking cookies on public status pages.
+- 6-week solo-founder MVP timeline with infrastructure spend capped under $50/month for the initial 500 monitors.
 
 <system_state>
 {

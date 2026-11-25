@@ -36,7 +36,12 @@ export function setFlow(data) {
   flow = { nodes: (data.nodes || []).map(withDefaults), edges: data.edges || [], sections: data.sections || [] };
   const ids = new Set(flow.nodes.map((n) => n.id));
   for (const [id, f] of frames) {
-    if (!ids.has(id)) { f.el.remove(); f.title.remove(); frames.delete(id); }
+    if (!ids.has(id)) {
+      f.el.remove();
+      f.title.remove();
+      frames.delete(id);
+      if (selectedId === id) selectedId = null;
+    }
   }
   for (const node of flow.nodes) {
     const f = frames.get(node.id) || createFrame(node.id);
@@ -52,15 +57,23 @@ export function setFlow(data) {
 
 function createFrame(id) {
   const el = document.createElement('div');
-  el.innerHTML = '<div class="frame-bezel"></div><div class="frame-screen"></div><div class="frame-lod"></div>';
-  const host = el.children[1];
+  el.tabIndex = 0;
+  el.setAttribute('role', 'button');
+  const bezel = document.createElement('div');
+  bezel.className = 'frame-bezel';
+  const host = document.createElement('div');
+  host.className = 'frame-screen';
+  const lod = document.createElement('div');
+  lod.className = 'frame-lod';
+  el.append(bezel, host, lod);
+
   const root = host.attachShadow({ mode: 'open' });
   root.adoptedStyleSheets = [sharedSheet];
   const title = document.createElement('div');
   title.className = 'frame-title';
   layers.frames.append(el);
   layers.frameTitles.append(title);
-  const f = { node: null, el, host, root, title, lod: el.children[2], state: 'idle', token: 0, deps: new Set(), anchors: new Map(), outer: null };
+  const f = { node: null, el, host, root, title, lod, state: 'idle', token: 0, deps: new Set(), anchors: new Map(), outer: null };
   frames.set(id, f);
   return f;
 }
@@ -69,6 +82,7 @@ function place(f, n) {
   f.node = n;
   f.el.className = `frame device-${n.device}${n.id === selectedId ? ' is-selected' : ''}`;
   f.el.dataset.id = n.id;
+  f.el.setAttribute('aria-label', n.title || n.id);
   px(f.el, { left: n.x, top: n.y, width: n.w, height: n.h });
   f.lod.textContent = n.title;
   f.lod.style.fontSize = `${Math.round(Math.min(n.w, n.h) / 8)}px`;
@@ -82,15 +96,28 @@ function place(f, n) {
 async function mount(f) {
   const token = ++f.token;
   f.state = 'loading';
-  let out;
+  let out = null;
+  let loadErr = null;
   try {
     out = await renderScreen(f.node.file);
   } catch (err) {
-    out = { html: `<div style="padding:24px;font:14px system-ui;color:#c62828">Could not load ${f.node.file}<br>${err.message}</div>`, deps: new Set() };
+    loadErr = err;
   }
   if (token !== f.token) return; // a newer render started meanwhile
-  f.root.innerHTML = out.html;
-  f.deps = out.deps;
+  if (loadErr) {
+    const errEl = document.createElement('div');
+    errEl.style.cssText = 'padding:24px;font:14px system-ui;color:#c62828';
+    errEl.append(
+      document.createTextNode(`Could not load ${f.node.file}`),
+      document.createElement('br'),
+      document.createTextNode(loadErr?.message || String(loadErr)),
+    );
+    f.root.replaceChildren(errEl);
+    f.deps = new Set();
+  } else {
+    f.root.innerHTML = out.html;
+    f.deps = out.deps;
+  }
   f.state = 'ready';
   measureAnchors(f);
   scheduleEdges();
@@ -108,7 +135,14 @@ function premount() {
   const next = [...frames.values()].find((f) => f.state === 'idle');
   if (!next) return;
   premounting = true;
-  idle(() => mount(next).finally(() => { premounting = false; premount(); }));
+  idle(() => {
+    if (!next.node || !frames.has(next.node.id) || next.state !== 'idle') {
+      premounting = false;
+      premount();
+      return;
+    }
+    mount(next).finally(() => { premounting = false; premount(); });
+  });
 }
 
 // Record where each outgoing edge's trigger element sits, in node-local world px.
@@ -119,6 +153,10 @@ function measureAnchors(f) {
   if (!out.length) return;
   f.host.style.display = 'block'; // measurable even while hidden by LOD or culling
   const box = f.host.getBoundingClientRect();
+  if (!(box.width > 0)) {
+    f.host.style.display = '';
+    return;
+  }
   const k = f.node.w / box.width; // client px -> world px
   for (const e of out) {
     const sel = anchorSelector(e);

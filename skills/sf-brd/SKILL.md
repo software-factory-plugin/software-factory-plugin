@@ -17,7 +17,7 @@ description: >-
   - `sf-market-research` `<system_state>`: `competitors`, `market_gap_defined`, `validation_status`, `identified_risks`
 - **Input Resolution Order:** Locate required upstream `<system_state>` blocks in this order before triggering the Missing-Input Guard: (1) files or text explicitly provided in the user prompt, (2) earlier turns in the current conversation, (3) canonical workspace files `docs/factory/01-vision.md` and `docs/factory/02-market-research.md` (if working in a repository).
 - **Missing-Input Guard:** If any required upstream `<system_state>` block is missing, incomplete, or contains invalid JSON, **STOP** immediately and ask the user to provide it (or offer to run `sf-vision` / `sf-market-research` first). Never guess or invent upstream requirements.
-- **Strict Constraint Inheritance:** Carry forward and enforce all upstream `hard_constraints` and `explicitly_out_of_scope` items (plus `compliance_requirements` and `budget_or_timeline_constraints` when present).
+- **Strict Constraint Inheritance:** Carry forward and enforce all upstream `sf-vision` `hard_constraints` and `explicitly_out_of_scope` items.
 - **Stage Boundaries & Gate:**
   - **Gate:** If `validation_status` in `sf-market-research` is `"Pivot Required"`, **STOP** and confirm with the user whether to proceed or pivot before drafting a BRD.
   - **Scope:** Define monetization, 3-4 primary KPIs, and legal/compliance/budget/timeline constraints grounded strictly in upstream state without adding out-of-scope features, UI flows, or technical architecture.
@@ -32,7 +32,7 @@ description: >-
 1. Ingest and validate the `sf-vision` and `sf-market-research` `<system_state>` JSON blocks; enforce the Missing-Input Guard and the `"Pivot Required"` handoff gate.
 2. Define a concrete monetization or value-capture model aligned to `primary_user`, `market_gap_defined`, `competitors`, and `identified_risks` while respecting `hard_constraints` and `explicitly_out_of_scope`.
 3. Establish 3-4 measurable primary Key Performance Indicators (KPIs) that prove business and operational success 6 months post-launch.
-4. Specify non-negotiable legal, privacy, security, and regulatory requirements (e.g., GDPR, HIPAA, PCI) plus concrete budget and timeline constraints, preserving any upstream compliance or budget/timeline constraints.
+4. Specify non-negotiable legal, privacy, security, and regulatory requirements (`compliance_requirements`, e.g., GDPR, HIPAA, PCI) plus concrete `budget_or_timeline_constraints`, grounded in user inputs and `sf-vision` `hard_constraints`.
 5. Produce the 80/20 hybrid artifact below and run all validation checks before returning.
 
 ## Output Format (80/20 Hybrid Artifact)

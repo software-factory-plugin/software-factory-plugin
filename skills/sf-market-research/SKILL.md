@@ -15,7 +15,7 @@ description: >-
 - **Required Upstream Input:** The `sf-vision` artifact containing its `<system_state>` block (`project_name`, `primary_user`, `hard_constraints`, `explicitly_out_of_scope`).
 - **Input Resolution Order:** Locate required upstream `<system_state>` blocks in this order before triggering the Missing-Input Guard: (1) files or text explicitly provided in the user prompt, (2) earlier turns in the current conversation, (3) canonical workspace file `docs/factory/01-vision.md` (if working in a repository).
 - **Missing-Input Guard:** If any required upstream `<system_state>` block is missing or contains invalid JSON, **STOP** and ask the user to provide it (or offer to run `sf-vision` first)—never guess or invent upstream requirements.
-- **Strict Constraint Inheritance:** All identified gaps and recommendations must strictly adhere to upstream `hard_constraints` and `explicitly_out_of_scope` (plus `compliance_requirements` and `budget_or_timeline_constraints` when present).
+- **Strict Constraint Inheritance:** All identified gaps and recommendations must strictly adhere to upstream `sf-vision` `hard_constraints` and `explicitly_out_of_scope`.
 - **Stage Boundaries & Verification Gate:** Identify 3–5 direct or indirect competitors, analyze their strengths, weaknesses, and pricing models, and pinpoint a market gap that never violates `explicitly_out_of_scope` or `hard_constraints`. Use live web search if available in the harness to verify competitors and pricing; if offline or unverified, tag unverified claims with `[Unverified Assumption]` rather than fabricating facts.
 - **Prompt Quality Gate (Context-Aware):** Run after resolving upstream `01-vision.md` `<system_state>` (exempt targeted revisions of an existing `02-market-research.md` or explicit `sf-review` fixes):
   - *High-Signal Check:* If `01-vision.md` resolves cleanly and no anti-pattern is triggered, concise prompts (e.g., *"Run `sf-market-research`"*) pass silently. Pause only if prompt + upstream state leaves market/geography/segment focus critically ambiguous or hits an anti-pattern.
@@ -25,7 +25,7 @@ description: >-
 
 ## Execution Steps
 
-1. **Validate Upstream State:** Parse the `sf-vision` `<system_state>` JSON and extract `project_name`, `primary_user`, `hard_constraints`, `explicitly_out_of_scope`, and any `compliance_requirements` or `budget_or_timeline_constraints` (trigger the Missing-Input Guard if missing or invalid).
+1. **Validate Upstream State:** Parse the `sf-vision` `<system_state>` JSON and extract `project_name`, `primary_user`, `hard_constraints`, and `explicitly_out_of_scope` (trigger the Missing-Input Guard if missing or invalid).
 2. **Identify Competitors (3–5):** Select 3–5 direct or indirect competitors serving `primary_user` or addressing the core problem; use live web search when available and tag any unverified claims with `[Unverified Assumption]`.
 3. **Analyze Strengths, Weaknesses & Pricing:** Evaluate each competitor's strengths, concrete failures for `primary_user`, and pricing model.
 4. **Pinpoint the Market Gap:** Define the specific niche the Vision will exploit without violating `hard_constraints` or `explicitly_out_of_scope`, and determine `validation_status` (`"Proceed"` or `"Pivot Required"`).
@@ -67,7 +67,7 @@ Place strict, valid JSON directly inside `<system_state>...</system_state>` (no 
 Before returning the artifact, verify:
 - **Valid Strict JSON:** `<system_state>` contains valid, parseable JSON with `"phase": "market-research"`, no code fences, no comments, and no trailing commas.
 - **Narrative/State Parity:** Every competitor, pricing model, market gap, `validation_status`, and risk in `<system_state>` matches the Markdown sections above.
-- **Zero Leakage:** No market gap or recommendation violates upstream `hard_constraints`, `explicitly_out_of_scope`, `compliance_requirements`, or `budget_or_timeline_constraints`.
+- **Zero Leakage:** No market gap or recommendation violates upstream `sf-vision` `hard_constraints` or `explicitly_out_of_scope`.
 
 - **Save Location:** When working in a workspace/repository, write the generated artifact to `docs/factory/02-market-research.md` (creating `docs/factory/` if needed) in addition to returning it in chat; otherwise recommend saving it to `docs/factory/02-market-research.md`.
 - **Review Gate & Handoff:** Pause for human review and **never auto-advance**. Suggest running `sf-review` against the upstream artifact(s) before advancing to `sf-brd` (after human review; pause and confirm direction if `validation_status` is `"Pivot Required"`).

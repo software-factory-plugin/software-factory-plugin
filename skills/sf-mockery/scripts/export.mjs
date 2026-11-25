@@ -2,69 +2,113 @@
 // Compiles flow.json, tokens.css, kit.css, optional fonts.css, components/*.html,
 // screens/*.html, local assets/*, and the Mockery viewer into one self-contained HTML file
 // that opens directly via file:// with zero server, Node, or network required.
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { escHtml, toPosixPath } from '../../../lib/cli-utils.mjs';
+import { isPathInside, resolveContainedPath } from '../../../lib/fs-safe.mjs';
 import { MIME_TYPES, deriveProjectName } from './server.mjs';
-import { safeResolve } from './check.mjs';
 
 const SCRIPTS_ROOT = path.dirname(fileURLToPath(import.meta.url));
 const VIEWER_DIR = path.join(SCRIPTS_ROOT, 'viewer');
 
-const escAttr = (s) => String(s).replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 const escStyle = (css) => String(css).replace(/<\/style/gi, '<\\/style');
-const escScriptJson = (obj) => JSON.stringify(obj).replace(/<\//g, '<\\/').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
-const toPosix = (p) => p.split(path.sep).join('/');
+const escScriptJson = (obj) =>
+  JSON.stringify(obj)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
+
+const sha256Csp = (content) =>
+  `'sha256-${crypto.createHash('sha256').update(content, 'utf8').digest('base64')}'`;
+
+const sortEntries = (entries) =>
+  entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 
 function collectAssets(absRoot) {
-  const assetsDir = path.join(absRoot, 'assets');
   const dataUriMap = new Map();
-  if (!fs.existsSync(assetsDir)) return dataUriMap;
+  const dirResolved = resolveContainedPath(absRoot, 'assets', {
+    allowSymlinks: false,
+    requireFile: false,
+  });
+  if (!dirResolved.ok || !dirResolved.stat.isDirectory()) return dataUriMap;
+  const realRoot = fs.realpathSync(absRoot);
 
   const walk = (dir) => {
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (entry.name.startsWith('.')) continue;
+    const entries = sortEntries(fs.readdirSync(dir, { withFileTypes: true }));
+    for (const entry of entries) {
+      if (entry.name.startsWith('.') || entry.isSymbolicLink()) continue;
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) {
         walk(full);
-      } else {
-        const rel = toPosix(path.relative(absRoot, full));
+      } else if (entry.isFile()) {
+        const rel = toPosixPath(path.relative(realRoot, full));
         const mime = MIME_TYPES[path.extname(entry.name).toLowerCase()] || 'application/octet-stream';
         const b64 = fs.readFileSync(full).toString('base64');
         dataUriMap.set(rel, `data:${mime};base64,${b64}`);
       }
     }
   };
-  walk(assetsDir);
+  walk(dirResolved.realPath);
   return dataUriMap;
 }
 
 function inlineAssetRefs(text, assetMap) {
   if (!text || assetMap.size === 0) return text;
-  // Match /assets/... or assets/... inside HTML attributes or CSS url(...)
-  return text.replace(/(?:\/|\.?\/)?(assets\/[^\s"'()<>]+)/g, (match, rel) => {
-    const clean = rel.split(/[?#]/)[0];
-    return assetMap.has(clean) ? assetMap.get(clean) : match;
-  });
+
+  const resolveAsset = (rawRel, suffix = '') => {
+    if (suffix && suffix.includes('#')) return null; // preserve SVG/HTML #fragment references
+    const normalized = rawRel.replace(/^(?:(?:\.\.\/)+|\.\/|\/)/, '');
+    return assetMap.has(normalized) ? assetMap.get(normalized) : null;
+  };
+
+  // 1. CSS url(...) references (quoted or unquoted), anchored at url(...) boundary
+  let out = text.replace(
+    /url\(\s*(["']?)((?:(?:\.\.\/)+|\.\/|\/)?assets\/[^"'()\s<>#?]+)([?#][^"'()\s<>]*)?\1\s*\)/gi,
+    (match, quote, rawRel, suffix) => {
+      const uri = resolveAsset(rawRel, suffix);
+      return uri ? `url(${quote}${uri}${quote})` : match;
+    },
+  );
+
+  // 2. HTML quoted attribute values (e.g. src="/assets/logo.png", href="../assets/pic.webp")
+  out = out.replace(
+    /(=\s*)(["'])((?:(?:\.\.\/)+|\.\/|\/)?assets\/[^"'<>#?\s]+)([?#][^"'<>\s]*)?\2/gi,
+    (match, eq, quote, rawRel, suffix) => {
+      const uri = resolveAsset(rawRel, suffix);
+      return uri ? `${eq}${quote}${uri}${quote}` : match;
+    },
+  );
+
+  return out;
 }
 
 function collectHtmlDir(absRoot, subdir, assetMap) {
-  const dir = path.join(absRoot, subdir);
   const out = {};
-  if (!fs.existsSync(dir)) return out;
+  const dirResolved = resolveContainedPath(absRoot, subdir, {
+    allowSymlinks: false,
+    requireFile: false,
+  });
+  if (!dirResolved.ok || !dirResolved.stat.isDirectory()) return out;
+  const realRoot = fs.realpathSync(absRoot);
+
   const walk = (cur) => {
-    for (const entry of fs.readdirSync(cur, { withFileTypes: true })) {
-      if (entry.name.startsWith('.')) continue;
+    const entries = sortEntries(fs.readdirSync(cur, { withFileTypes: true }));
+    for (const entry of entries) {
+      if (entry.name.startsWith('.') || entry.isSymbolicLink()) continue;
       const full = path.join(cur, entry.name);
       if (entry.isDirectory()) {
         walk(full);
-      } else if (entry.name.endsWith('.html')) {
-        const rel = toPosix(path.relative(absRoot, full));
+      } else if (entry.isFile() && entry.name.endsWith('.html')) {
+        const rel = toPosixPath(path.relative(realRoot, full));
         out[rel] = inlineAssetRefs(fs.readFileSync(full, 'utf8'), assetMap);
       }
     }
   };
-  walk(dir);
+  walk(dirResolved.realPath);
   return out;
 }
 
@@ -110,16 +154,26 @@ function buildInlineViewerScript() {
   ].join('\n');
 }
 
-export function exportProject(root, { outFile, title } = {}) {
+export function exportProject(root, { outFile, title, includeTimestamp = false } = {}) {
   const absRoot = path.resolve(root);
-  const flowPath = path.join(absRoot, 'flow.json');
-  if (!fs.existsSync(flowPath)) {
+  const flowResolved = resolveContainedPath(absRoot, 'flow.json', {
+    allowSymlinks: false,
+    requireFile: true,
+  });
+  if (!flowResolved.ok) {
     throw new Error(`no flow.json in ${absRoot}`);
+  }
+
+  const targetOut = path.resolve(outFile || path.join(absRoot, 'preview.html'));
+  for (const protectedDir of ['screens', 'components', 'assets']) {
+    if (isPathInside(path.join(absRoot, protectedDir), targetOut)) {
+      throw new Error(`refusing to write export inside project ${protectedDir}/ directory: ${targetOut}`);
+    }
   }
 
   let flow;
   try {
-    flow = JSON.parse(fs.readFileSync(flowPath, 'utf8'));
+    flow = JSON.parse(fs.readFileSync(flowResolved.realPath, 'utf8'));
   } catch (err) {
     throw new Error(`invalid flow.json: ${err.message}`);
   }
@@ -128,9 +182,12 @@ export function exportProject(root, { outFile, title } = {}) {
   const files = {};
 
   for (const styleFile of ['tokens.css', 'kit.css']) {
-    const p = path.join(absRoot, styleFile);
-    if (fs.existsSync(p)) {
-      files[styleFile] = inlineAssetRefs(fs.readFileSync(p, 'utf8'), assetMap);
+    const resolved = resolveContainedPath(absRoot, styleFile, {
+      allowSymlinks: false,
+      requireFile: true,
+    });
+    if (resolved.ok) {
+      files[styleFile] = inlineAssetRefs(fs.readFileSync(resolved.realPath, 'utf8'), assetMap);
     }
   }
 
@@ -140,23 +197,34 @@ export function exportProject(root, { outFile, title } = {}) {
   const screens = collectHtmlDir(absRoot, 'screens', assetMap);
   Object.assign(files, screens);
 
-  // Also ensure any node.file outside screens/ (still inside project root) is included.
+  // Verify every flow.json node's screen file exists safely inside project root and is bundled.
   const nodes = Array.isArray(flow.nodes) ? flow.nodes : [];
   let screenCount = Object.keys(screens).length;
   for (const n of nodes) {
     if (!n?.id) continue;
     const rel = n.file ? String(n.file).replace(/^\.?\//, '') : `screens/${n.id}.html`;
-    if (files[rel]) continue;
-    const resolved = safeResolve(absRoot, rel);
-    if (resolved && fs.existsSync(resolved.full)) {
-      files[resolved.clean] = inlineAssetRefs(fs.readFileSync(resolved.full, 'utf8'), assetMap);
+    const resolved = resolveContainedPath(absRoot, rel, {
+      allowSymlinks: false,
+      requireFile: true,
+    });
+    if (!resolved.ok) {
+      if (resolved.reason === 'not_found' || resolved.reason === 'not_a_file') {
+        throw new Error(`node "${n.id}" screen file not found: ${rel}`);
+      }
+      throw new Error(`node "${n.id}" screen path is not allowed (${resolved.reason}): ${rel}`);
+    }
+    if (!Object.prototype.hasOwnProperty.call(files, resolved.clean)) {
+      files[resolved.clean] = inlineAssetRefs(fs.readFileSync(resolved.realPath, 'utf8'), assetMap);
       screenCount++;
     }
   }
 
-  const fontsPath = path.join(absRoot, 'fonts.css');
-  const fontsCss = fs.existsSync(fontsPath)
-    ? inlineAssetRefs(fs.readFileSync(fontsPath, 'utf8'), assetMap)
+  const fontsResolved = resolveContainedPath(absRoot, 'fonts.css', {
+    allowSymlinks: false,
+    requireFile: true,
+  });
+  const fontsCss = fontsResolved.ok
+    ? inlineAssetRefs(fs.readFileSync(fontsResolved.realPath, 'utf8'), assetMap)
     : '';
 
   const viewerCss = fs.readFileSync(path.join(VIEWER_DIR, 'viewer.css'), 'utf8');
@@ -166,50 +234,48 @@ export function exportProject(root, { outFile, title } = {}) {
 
   const bundlePayload = {
     version: 1,
-    exportedAt: new Date().toISOString(),
+    ...(includeTimestamp ? { exportedAt: new Date().toISOString() } : {}),
     projectName,
     flow,
     files,
   };
 
-  const html = [
-    '<!doctype html>',
-    `<html lang="en" data-project="${escAttr(projectId)}">`,
-    '<head>',
-    '  <meta charset="utf-8">',
-    `  <title>${escAttr(projectName)} · Mockery Preview</title>`,
+  const bundleScriptBody = `window.__MOCKERY_BUNDLE__ = ${escScriptJson(bundlePayload)};`;
+  const viewerScriptBody = `\n${viewerScript.replace(/<\/script/gi, '<\\/script')}\n  `;
+  const bundleHash = sha256Csp(bundleScriptBody);
+  const viewerHash = sha256Csp(viewerScriptBody);
+  const exportCsp = [
+    "default-src 'none'",
+    `script-src ${bundleHash} ${viewerHash}`,
+    "style-src 'unsafe-inline'",
+    'img-src data:',
+    'font-src data:',
+    "connect-src 'none'",
+    "object-src 'none'",
+    "base-uri 'none'",
+    "form-action 'none'",
+  ].join('; ');
+
+  const shellHtml = fs.readFileSync(path.join(VIEWER_DIR, 'index.html'), 'utf8');
+  const inlineStyles = [
+    `  <meta http-equiv="Content-Security-Policy" content="${escHtml(exportCsp)}">`,
     `  <style>\n${escStyle(viewerCss)}\n  </style>`,
     fontsCss ? `  <style>\n${escStyle(fontsCss)}\n  </style>` : '',
-    '</head>',
-    '<body>',
-    '  <div id="viewport">',
-    '    <div id="world">',
-    '      <div id="sections"></div>',
-    '      <div id="frames"></div>',
-    '      <svg id="edges" xmlns="http://www.w3.org/2000/svg"></svg>',
-    '      <div id="labels">',
-    '        <div id="section-titles"></div>',
-    '        <div id="frame-titles"></div>',
-    '        <div id="edge-labels"></div>',
-    '      </div>',
-    '    </div>',
-    '  </div>',
-    '',
-    '  <div id="hud">',
-    '    <span id="status" title="Standalone exported preview"></span>',
-    '    <b id="zoom">100%</b>',
-    '    <span class="hints"><kbd>0</kbd> fit <kbd>+</kbd><kbd>−</kbd> zoom <kbd>1</kbd> 100% <kbd>T</kbd> theme</span>',
-    '    <span id="flash"></span>',
-    '  </div>',
-    '  <div id="toast"></div>',
-    `  <script>window.__MOCKERY_BUNDLE__ = ${escScriptJson(bundlePayload)};</script>`,
-    `  <script>\n${viewerScript.replace(/<\/script/gi, '<\\/script')}\n  </script>`,
-    '</body>',
-    '</html>',
-    '',
-  ].filter((line, idx, arr) => !(line === '' && arr[idx - 1] === '')).join('\n');
+  ].filter(Boolean).join('\n');
 
-  const targetOut = path.resolve(outFile || path.join(absRoot, 'preview.html'));
+  const html = shellHtml
+    .replaceAll('{{project-id}}', () => escHtml(projectId))
+    .replace('<title>{{project-name}} · Mockery</title>', () => `<title>${escHtml(projectName)} · Mockery Preview</title>`)
+    .replaceAll('{{project-name}}', () => escHtml(projectName))
+    .replace('  <link rel="stylesheet" href="/__mockery/viewer.css">', () => inlineStyles)
+    .replace(/\r?\n  <link rel="stylesheet" href="\/__mockery\/fonts\.css">/, '')
+    .replace(/\r?\n  <script type="module" src="\/__mockery\/main\.js"><\/script>/, '')
+    .replace('title="Hot reload connection"', 'title="Standalone exported preview"')
+    .replace(
+      '</body>',
+      () => `  <script>${bundleScriptBody}</script>\n  <script>${viewerScriptBody}</script>\n</body>`,
+    );
+
   fs.mkdirSync(path.dirname(targetOut), { recursive: true });
   fs.writeFileSync(targetOut, html, 'utf8');
 

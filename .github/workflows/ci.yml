@@ -3,18 +3,69 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
 jobs:
-  evals:
-    name: Software Factory Evals & Packaging Checks (Node 20)
-    runs-on: ubuntu-latest
+  verify:
+    name: Verify (${{ matrix.os }} / Node ${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        node: ["22", "24"]
+        include:
+          - os: macos-latest
+            node: "24"
+          - os: windows-latest
+            node: "24"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: "20"
-      - name: Verify manifest & README version sync
+          node-version: ${{ matrix.node }}
+      - name: Verify manifest, README & CHANGELOG version sync
         run: node scripts/bump-version.mjs --check
-      - name: Run deterministic eval suite
+      - name: Run deterministic eval suite (skills, strict schemas, guards, tokens)
         run: node evals/run.mjs --ascii
+      - name: Run zero-dependency runtime & security test suite
+        run: node --test --test-timeout=30000 tests/*.test.mjs
+
+  release-tag-guard:
+    name: Release Tag Version Parity
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "24"
+      - name: Verify git tag matches all 6 manifests, README.md, and CHANGELOG.md
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          node -e '
+            import("./scripts/bump-version.mjs").then(({ checkVersions }) => {
+              const res = checkVersions();
+              if (!res.ok) {
+                console.error("Version sync check failed:", JSON.stringify(res, null, 2));
+                process.exit(1);
+              }
+              const expectedTag = `v${res.version}`;
+              if (process.env.TAG_NAME !== expectedTag) {
+                console.error(`Tag mismatch: git tag=${process.env.TAG_NAME} !== manifest version=${expectedTag}`);
+                process.exit(1);
+              }
+              console.log(`Release tag guard passed: ${expectedTag}`);
+            });
+          '

@@ -96,6 +96,7 @@ export function runSkillsAudit(repoRoot) {
     ".agents/plugins/marketplace.json",
   ];
   const marketplaceVersions = [];
+  const marketplaceEntries = [];
   for (const rel of marketplaceRelPaths) {
     const full = path.join(repoRoot, rel);
     try {
@@ -109,8 +110,10 @@ export function runSkillsAudit(repoRoot) {
         entry ? `Valid marketplace entry (v${entry.version})` : "Missing software-factory plugin entry"
       );
       if (entry?.version) marketplaceVersions.push(entry.version);
+      marketplaceEntries.push({ rel, data: parsed, entry });
     } catch (err) {
       add(`marketplace-json:${rel}`, false, `Invalid JSON: ${err.message}`);
+      marketplaceEntries.push({ rel, data: null, entry: null });
     }
   }
 
@@ -118,6 +121,12 @@ export function runSkillsAudit(repoRoot) {
     [...manifests.map((m) => m.data?.version), ...marketplaceVersions].filter(Boolean)
   );
   const names = new Set(manifests.map((m) => m.data?.name).filter(Boolean));
+  const descriptions = new Set(
+    [
+      ...manifests.map((m) => m.data?.description),
+      ...marketplaceEntries.map((m) => m.entry?.description),
+    ].filter((d) => typeof d === "string" && d.trim().length > 0)
+  );
   add(
     "manifest-version-sync",
     versions.size === 1 &&
@@ -132,25 +141,82 @@ export function runSkillsAudit(repoRoot) {
     names.size === 1 && [...names][0] === "software-factory",
     `Plugin name across manifests: ${[...names].join(", ")}`
   );
+  add(
+    "manifest-description-sync",
+    descriptions.size === 1 &&
+      manifests.every((m) => typeof m.data?.description === "string" && m.data.description.trim().length > 0) &&
+      marketplaceEntries.every((m) => typeof m.entry?.description === "string" && m.entry.description.trim().length > 0),
+    descriptions.size === 1
+      ? "All 6 manifests share identical description"
+      : `Description drift detected across manifests (${descriptions.size} distinct values)`
+  );
 
-  // 2b. Packaging assets & MIT license checks
+  // 2b. Packaging assets, cross-manifest path & schema checks, MIT license
   const licenseExists = fs.existsSync(path.join(repoRoot, "LICENSE"));
   add(
     "packaging:license-exists",
     licenseExists,
     licenseExists ? "LICENSE file present" : "Missing root LICENSE file"
   );
-  const logoRel = manifests[0]?.data?.logo;
-  const logoExists =
-    typeof logoRel === "string" &&
-    logoRel.length > 0 &&
-    fs.existsSync(path.join(repoRoot, logoRel));
+
+  const checkRelPath = (id, relPath, label) => {
+    const ok =
+      typeof relPath === "string" &&
+      relPath.length > 0 &&
+      fs.existsSync(path.resolve(repoRoot, relPath));
+    add(
+      id,
+      ok,
+      ok ? `${label} "${relPath}" present` : `Missing or invalid ${label} (${String(relPath)})`
+    );
+  };
+
+  const antigravity = manifests.find((m) => m.rel === "plugin.json")?.data;
+  const claude = manifests.find((m) => m.rel === ".claude-plugin/plugin.json")?.data;
+  const codex = manifests.find((m) => m.rel === ".codex-plugin/plugin.json")?.data;
+  const gemini = manifests.find((m) => m.rel === "gemini-extension.json")?.data;
+  const claudeMkt = marketplaceEntries.find((m) => m.rel === ".claude-plugin/marketplace.json")?.entry;
+  const codexMkt = marketplaceEntries.find((m) => m.rel === ".agents/plugins/marketplace.json")?.entry;
+
+  checkRelPath("packaging:logo-exists", antigravity?.logo, "plugin.json logo");
+  checkRelPath("packaging:codex-skills-path", codex?.skills, ".codex-plugin/plugin.json skills");
+  checkRelPath("packaging:codex-logo-exists", codex?.interface?.logo, ".codex-plugin/plugin.json interface.logo");
+  checkRelPath(
+    "packaging:codex-composer-icon-exists",
+    codex?.interface?.composerIcon,
+    ".codex-plugin/plugin.json interface.composerIcon"
+  );
+  checkRelPath("packaging:claude-marketplace-source", claudeMkt?.source, ".claude-plugin/marketplace.json source");
+  checkRelPath(
+    "packaging:codex-marketplace-source",
+    codexMkt?.source?.path,
+    ".agents/plugins/marketplace.json source.path"
+  );
+
+  const codexAuthPolicy = codexMkt?.policy?.authentication;
   add(
-    "packaging:logo-exists",
-    logoExists,
-    logoExists
-      ? `plugin.json logo "${logoRel}" present`
-      : `Missing or unreferenced logo asset (${String(logoRel)})`
+    "packaging:codex-auth-free-policy",
+    codexAuthPolicy !== "ON_INSTALL",
+    codexAuthPolicy !== "ON_INSTALL"
+      ? `Auth-free marketplace policy (${codexAuthPolicy ?? "none"})`
+      : 'Codex marketplace sets policy.authentication="ON_INSTALL" on an auth-free plugin'
+  );
+
+  const schemaFieldsOk = Boolean(
+    antigravity?.displayName &&
+      Array.isArray(antigravity?.suggestedPrompts) &&
+      claude?.license === "MIT" &&
+      Array.isArray(claude?.keywords) &&
+      codex?.interface?.displayName &&
+      codex?.interface?.shortDescription &&
+      gemini?.name === "software-factory"
+  );
+  add(
+    "packaging:manifest-schemas",
+    schemaFieldsOk,
+    schemaFieldsOk
+      ? "All 4 harness manifests satisfy required schema fields"
+      : "One or more harness manifests are missing required fields"
   );
 
   // 3. Skill directory & frontmatter checks
@@ -160,6 +226,16 @@ export function runSkillsAudit(repoRoot) {
     .filter((d) => d.isDirectory())
     .map((d) => d.name)
     .sort();
+
+  const expectedSorted = [...EXPECTED_SKILLS].sort();
+  const unexpectedDirs = actualDirs.filter((d) => !EXPECTED_SKILLS.includes(d));
+  add(
+    "skills-exact-parity",
+    unexpectedDirs.length === 0 && actualDirs.length === expectedSorted.length,
+    unexpectedDirs.length === 0 && actualDirs.length === expectedSorted.length
+      ? `Exact parity: ${actualDirs.length} expected skill directories`
+      : `Directory mismatch (unexpected: ${unexpectedDirs.join(", ") || "none"})`
+  );
 
   for (const expected of EXPECTED_SKILLS) {
     add(
@@ -192,8 +268,8 @@ export function runSkillsAudit(repoRoot) {
     const words = fm.description.split(/\s+/).filter(Boolean).length;
     add(
       `skill-desc-concise:${dirName}`,
-      words >= 15 && words <= 180,
-      `${words} words (budget: 15..180)`
+      words >= 15 && words <= 85,
+      `${words} words (budget: 15..85)`
     );
 
     const hasNegativeBoundary = /Do NOT\b/i.test(fm.description);
