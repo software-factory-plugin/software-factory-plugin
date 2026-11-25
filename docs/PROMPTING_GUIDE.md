@@ -118,15 +118,15 @@ When `sf-telemetry` flags `SPLIT_REQUIRED` (`8 pts`) or `scope_blowup` (`felt / 
 ## 5. Cross-Harness Tips
 
 - **Antigravity:** Supports all 12 skills natively via `plugin.json`, inline `sf-tree` snapshots, and opening `http://127.0.0.1:4173` directly in the built-in browser pane.
-- **Claude Code:** Loads `.claude-plugin/plugin.json` + `.claude-plugin/marketplace.json` + `skills/`. Run `sf-tree`, `sf-mockery`, and `sf-telemetry` scripts directly with Node.js 20+ (`--ascii`, `--mermaid`, `--json`, or `--serve`).
-- **OpenAI Codex:** Loads `.codex-plugin/plugin.json` + `.agents/plugins/marketplace.json` + shared `skills/`. Supports all 12 skills and Node.js 20+ CLI workflows identically, with graceful pure-markdown fallback whenever Node 20+ is absent.
-- **Gemini CLI:** Links via `gemini-extension.json` (`gemini extensions link .`). Identical CLI behavior across all bundled Node.js 20+ scripts, with graceful pure-markdown fallback whenever Node 20+ is absent.
+- **Claude Code:** Loads `.claude-plugin/plugin.json` + `.claude-plugin/marketplace.json` + `skills/`. Run `sf-tree`, `sf-mockery`, and `sf-telemetry` scripts directly with Node.js 22+ (`--ascii`, `--mermaid`, `--json`, or `--serve`).
+- **OpenAI Codex:** Loads `.codex-plugin/plugin.json` + `.agents/plugins/marketplace.json` + shared `skills/`. Supports all 12 skills and Node.js 22+ CLI workflows identically, with graceful pure-markdown fallback whenever Node 22+ is absent.
+- **Gemini CLI:** Links via `gemini-extension.json` (`gemini extensions link .`). Identical CLI behavior across all bundled Node.js 22+ scripts, with graceful pure-markdown fallback whenever Node 22+ is absent.
 
 ---
 
 ## 6. Running the Automated Eval & Test Suites
 
-Contributors and operators can verify all 12 skills, golden PulseBoard `<system_state>` fixtures, Missing-Input Guards, `sf-review` vectors, idle-router token budgets, and Node.js 20+ unit/security tests offline with zero npm dependencies:
+Contributors and operators can verify all 12 skills, golden PulseBoard `<system_state>` fixtures, Missing-Input Guards, `sf-review` vectors, idle-router token budgets, and Node.js 22+ unit/security tests offline with zero npm dependencies:
 
 ```bash
 node evals/run.mjs --ascii

@@ -42,12 +42,12 @@ Core invariants enforced by `scripts/cli.mjs check`:
 
 ## Execution Steps
 
-Resolve `<skill_dir>` to this skill's directory (hosting the zero-dep Node 20+ CLI `scripts/cli.mjs`).
+Resolve `<skill_dir>` to this skill's directory (hosting the zero-dep Node 22+ CLI `scripts/cli.mjs`).
 
 1. **Validate Inputs & Mode:** Parse upstream `<system_state>` blocks (stopping on missing/invalid inputs), lock inherited constraints, and confirm **Styled Mode** (`06-ui.md` present, `tokens_synced_from_ui: true`), **Wireframe Mode** (without `06-ui.md`, `tokens_synced_from_ui: false`), or an in-place restyle/update.
 2. **Plan Canvas:** Map every `sf-ux` screen, `primary_navigation_pattern`, `key_interactions`, and critical `empty`/`loading`/`error` state to device-sized nodes, sections, edges, and shared components (per `references/mockery-reference.md`).
 3. **Write Canvas Files:** Write `tokens.css`, `kit.css`, `components/*.html`, `screens/*.html`, and `flow.json` under `docs/factory/mockups/` (never writing `CLAUDE.md`).
-4. **Validate:** Run `node <skill_dir>/scripts/cli.mjs check docs/factory/mockups --json` and fix all errors before returning (or verify statically if Node 20+ is unavailable).
+4. **Validate:** Run `node <skill_dir>/scripts/cli.mjs check docs/factory/mockups --json` and fix all errors before returning (or verify statically if Node 22+ is unavailable).
 5. **Write Manifest & Pause:** Emit `docs/factory/06b-mockery.md`, surface viewer/export commands, and pause for human review.
 
 ## Output Format (80/20 Hybrid Artifact)
@@ -98,5 +98,5 @@ Before returning, verify:
 - **Bundled Viewer & Offline Export (Zero External Dependencies):**
   - Live hot-reload canvas (`127.0.0.1:5180`, SSE hot reload): `node <skill_dir>/scripts/cli.mjs serve docs/factory/mockups`
   - Standalone offline `preview.html` (opens over `file://` without Node.js): `node <skill_dir>/scripts/cli.mjs export docs/factory/mockups` (or `--out <path>`)
-  - Pure file-only fallback succeeds cleanly when Node 20+ is unavailable.
+  - Pure file-only fallback succeeds cleanly when Node 22+ is unavailable.
 - **Handoff Gate:** Pause for human review and suggest running `sf-review` against upstream artifacts (`sf-vision` + `sf-ux`, plus `sf-ui` in `styled` mode) before advancing to `sf-architecture` (or `sf-ui` if in `wireframe` mode). Never auto-advance.

@@ -7,7 +7,7 @@ import os from "node:os";
 import path from "node:path";
 
 import {
-  assertNode20,
+  assertNodeVersion,
   escHtml,
   hashShort,
   isDirectRun,
@@ -66,9 +66,9 @@ function createMockRes() {
   return res;
 }
 
-test("cli-utils: assertNode20, escHtml, posixShellQuote, hashShort, toPosixPath, isDirectRun", () => {
-  assert.doesNotThrow(() => assertNode20(20));
-  assert.throws(() => assertNode20(999), /Node\.js >= 999\.0\.0/);
+test("cli-utils: assertNodeVersion, escHtml, posixShellQuote, hashShort, toPosixPath, isDirectRun", () => {
+  assert.doesNotThrow(() => assertNodeVersion(22));
+  assert.throws(() => assertNodeVersion(999), /Node\.js >= 999\.0\.0/);
 
   assert.equal(
     escHtml(`<div class="a" data-x='b'>&</div>`),

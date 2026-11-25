@@ -1,5 +1,5 @@
 // Monorepo-aware sync & async memoized git timestamp resolution for sf-tree.
-// Computes a single canonical scalar freshness timestamp per file (Node 20+ built-ins only).
+// Computes a single canonical scalar freshness timestamp per file (Node 22+ built-ins only).
 import { execFile, execFileSync } from "node:child_process";
 import { promisify } from "node:util";
 

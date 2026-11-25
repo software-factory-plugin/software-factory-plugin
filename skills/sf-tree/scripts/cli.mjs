@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import path from "node:path";
 import process from "node:process";
-import { assertNode20, isDirectRun } from "../../../lib/cli-utils.mjs";
+import { assertNodeVersion, isDirectRun } from "../../../lib/cli-utils.mjs";
 import { analyzeWorkspace } from "./analyzer.mjs";
 import {
   findDefaultWorkGraphPath,
@@ -175,7 +175,7 @@ export function parseArgs(argv) {
 }
 
 async function main() {
-  assertNode20();
+  assertNodeVersion();
 
   let opts;
   try {

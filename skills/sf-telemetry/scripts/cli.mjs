@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { parseArgs } from "node:util";
-import { assertNode20, isDirectRun } from "../../../lib/cli-utils.mjs";
+import { assertNodeVersion, isDirectRun } from "../../../lib/cli-utils.mjs";
 import {
   FIBONACCI_RUBRIC,
   appendTelemetryRecords,
@@ -173,7 +173,7 @@ function emitWarningsStderr(warnings) {
 }
 
 export async function main(argv = process.argv.slice(2)) {
-  assertNode20();
+  assertNodeVersion();
   const { command, flags } = parseCliArgs(argv);
   if (command === "help") {
     printHelp();

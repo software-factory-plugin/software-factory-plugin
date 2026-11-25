@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Software Factory bundled Mockery CLI (zero dependencies, Node 20+ built-ins only).
+// Software Factory bundled Mockery CLI (zero dependencies, Node 22+ built-ins only).
 // Commands:
 //   serve [dir] [--port <n>] [--dev]   Serve a Mockery canvas with SSE hot reload (default command)
 //   check [dir] [--json]               Validate flow.json, screens, components, edges, and static lints
@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
-import { assertNode20, isDirectRun } from '../../../lib/cli-utils.mjs';
+import { assertNodeVersion, isDirectRun } from '../../../lib/cli-utils.mjs';
 import { installGracefulShutdown } from '../../../lib/http-sse.mjs';
 import { serve } from './server.mjs';
 import { checkProject } from './check.mjs';
@@ -145,7 +145,7 @@ async function runServe(dir, { port, dev } = {}) {
 }
 
 async function main() {
-  assertNode20();
+  assertNodeVersion();
   const opts = parse(process.argv.slice(2));
   const cmd = opts.args[0];
 

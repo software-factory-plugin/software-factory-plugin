@@ -1,5 +1,5 @@
 // Strict <system_state> extraction and schema validation for Software Factory pipeline stages.
-// Node 20+ built-ins only.
+// Node 22+ built-ins only.
 
 export const REQUIRED_KEYS = Object.freeze({
   vision: [

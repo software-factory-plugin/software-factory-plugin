@@ -15,7 +15,7 @@ Pair disciplined Fibonacci agile sizing (`1, 2, 3, 5, 8`) with LLM model, non-ov
 - **Zero Idle Token Overhead:** Strictly on-demand skill (`0` always-on rules, `0` hooks, `0` MCP servers; router-only metadata). Never install background hooks or commit telemetry logs into consumer repositories.
 - **Out-of-Repo Hashed Storage Default:** Telemetry JSONL logs live outside the repository working tree under `~/.config/software-factory/telemetry/<workspace-slug>-<sha256-8>.jsonl` (private directory `0o700`, file mode `0o600`, advisory lockfile + atomic upsert; overridable via `--store <path>` or `SF_TELEMETRY_STORE`). Explicit store paths inside the workspace, git root, or traversing symlinks are rejected.
 - **8-Point Epic Split Gate:** Any issue estimated at `8` points carries high token-variance risk and MUST be decomposed into scoped `1`–`5` point issues before moving to `In Progress`.
-- **Zero External Dependencies:** All scripts under `<skill_dir>/scripts/` (`cli.mjs`, `schema.mjs`, `pricing.mjs`, `parsers.mjs`, `calibrator.mjs`) and shared `lib/` helpers run exclusively on Node.js 20+ stdlib.
+- **Zero External Dependencies:** All scripts under `<skill_dir>/scripts/` (`cli.mjs`, `schema.mjs`, `pricing.mjs`, `parsers.mjs`, `calibrator.mjs`) and shared `lib/` helpers run exclusively on Node.js 22+ stdlib.
 - **Prompt Quality Gate (Context-Aware):** Evaluate before invoking `scripts/cli.mjs` (exempt follow-up refinements to an active telemetry command):
   - *High-Signal Check:* Pass silently when the requested workflow (`size-check`, `log`, `format-comment`, `import-bootstrap`, `import-transcript`, or `report`) and its required inputs (estimate, issue ID/felt size, or import source path) are clear from prompt or conversation context. Pause on vague prompts (e.g., *"Check telemetry"* or *"Size this"*) missing workflow or target inputs.
   - *Anti-Patterns:* Asking to install always-on hooks, commit telemetry logs into the consumer repo, or skip splitting an `8`-point epic (all non-overridable).
@@ -112,9 +112,9 @@ node <skill_dir>/scripts/cli.mjs report --dir <workspace_root> --json --pricing 
 | `--dry-run` / `--strict` | Parse/validate without writing (`--dry-run`); fail `report` on corrupt JSONL lines (`--strict`). |
 | `--json` / `--markdown` / `--ascii` | Output format for `report`, `size-check`, `log`, and imports. |
 
-### 6. Cross-Harness No-Node 20+ Fallback
+### 6. Cross-Harness No-Node 22+ Fallback
 
-If Node.js 20+ is unavailable, apply the Fibonacci rubric manually, enforce splitting `8`-point issues, and emit the canonical closing telemetry block directly:
+If Node.js 22+ is unavailable, apply the Fibonacci rubric manually, enforce splitting `8`-point issues, and emit the canonical closing telemetry block directly:
 
 ```markdown
 ### Telemetry (Track #4 Bootstrap)

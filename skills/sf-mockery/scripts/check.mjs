@@ -1,4 +1,4 @@
-// Headless validator for a Mockery project folder. Zero dependencies (Node 20+ built-ins only).
+// Headless validator for a Mockery project folder. Zero dependencies (Node 22+ built-ins only).
 import fs from 'node:fs';
 import path from 'node:path';
 import { isPathInside, resolveContainedPath } from '../../../lib/fs-safe.mjs';

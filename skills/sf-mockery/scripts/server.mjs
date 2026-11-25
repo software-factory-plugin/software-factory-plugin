@@ -1,5 +1,5 @@
 // Mockery dev server: serves the bundled viewer and a project's files from its folder,
-// and streams file changes over SSE (/__events). Zero dependencies (Node 20+ built-ins only).
+// and streams file changes over SSE (/__events). Zero dependencies (Node 22+ built-ins only).
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';

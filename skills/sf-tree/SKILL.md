@@ -18,7 +18,7 @@ Provide an instant, strictly read-only interactive view across two complementary
 - **Strictly Read-Only:** NEVER create, edit, or delete files inside the consumer repository working tree (`docs/factory/` or repo root), NEVER mutate Linear issue states/estimates/relations from `sf-tree`, and NEVER auto-invoke downstream authoring skills (`sf-vision`..`sf-specs`, `sf-mockery`, `sf-review`).
 - **Zero Repo Pollution for Snapshots:** When exporting a Linear MCP snapshot for `--work-graph <path>`, always write the JSON file to your agent scratch directory or OS temp directory—never inside the consumer git working tree. *(A legacy `docs/factory/work-graph.json` is auto-detected strictly read-only if pre-existing, but never write snapshots into `docs/factory/`.)*
 - **Zero Secret Leakage:** When direct Linear GraphQL mode is used, `LINEAR_API_KEY` is read strictly from `process.env.LINEAR_API_KEY`—never written to disk, logged, or returned in JSON/HTTP responses.
-- **Zero External Dependencies:** All scripts under `<skill_dir>/scripts/` (`cli.mjs`, `analyzer.mjs`, `analyzer-schema.mjs`, `analyzer-git.mjs`, `work-analyzer.mjs`, `linear-adapter.mjs`, `formatters.mjs`, `server.mjs`, modular `scripts/ui/` assets `index.html`, `app.js`, `dag.js`, `markdown.js`, `styles.css`, and shared `lib/` helpers) run exclusively on Node.js 20+ stdlib.
+- **Zero External Dependencies:** All scripts under `<skill_dir>/scripts/` (`cli.mjs`, `analyzer.mjs`, `analyzer-schema.mjs`, `analyzer-git.mjs`, `work-analyzer.mjs`, `linear-adapter.mjs`, `formatters.mjs`, `server.mjs`, modular `scripts/ui/` assets `index.html`, `app.js`, `dag.js`, `markdown.js`, `styles.css`, and shared `lib/` helpers) run exclusively on Node.js 22+ stdlib.
 - **Human-in-the-Loop Handoff Gate:** After displaying a snapshot or launching `--serve`, present the recommended next action(s) and wait for the user to choose what to execute.
 - **Prompt Quality Gate (Context-Aware):** Evaluate before running queries or `--serve` (exempt follow-up refinements to an active `sf-tree` view):
   - *High-Signal Check:* Pass silently when mode (`Work Tech-Tree` vs. `Pipeline Stages`), target scope (workspace `docs/factory/` or Linear team/project/`--work-graph` path), and output (`--mermaid`/`--ascii`/`--json` vs. `--serve`) are clear from prompt + workspace context. Pause on vague prompts (e.g., *"What should I work on?"*) when mode or Linear team/project is ambiguous.
@@ -100,13 +100,13 @@ When launching the live HTTP + SSE web viewer (`127.0.0.1`, default port `4173` 
    - Project & Milestone scope dropdown, Quick Filters (`All`, `Ready to Start`, `In Progress`, `Blocked`, `Hide Done`), **Highlight Critical Path** (Work Tech-Tree) & **Highlight Stale Blast Radius** (Pipeline Stages) toggles, upstream (`cyan`) & downstream (`violet`) chain hover/click highlighting, clickable Blocker/Unlock jump links, allowlisted `https://` Linear & PR deep links, XSS-safe Markdown preview, and 1-click **Copy Prompt**.
    - Live SSE hot-reload on both `docs/factory/` changes (`event: graph`) and `--work-graph` / Linear polling updates (`event: work_graph`).
 
-### 4. Cross-Harness Degradation & No-Node 20+ Fallback
+### 4. Cross-Harness Degradation & No-Node 22+ Fallback
 
-If `node` is unavailable or older than Node 20 (`node -v` fails or reports `< 20`):
+If `node` is unavailable or older than Node 22 (`node -v` fails or reports `< 22`):
 
 1. Do **not** fail or ask the user to install npm packages.
 2. For Pipeline Stages, read `docs/factory/01-vision.md`–`08-specs.md`, optional `06b-mockery.md`, `mockups/flow.json`, and `reviews/*.md` directly, validate `<system_state>` JSON blocks, evaluate staleness/gates, and emit the status summary + Mermaid `flowchart LR` manually.
-3. For Work Tech-Tree, inspect the Linear MCP project/issue payloads directly, compute ready vs. blocked status and Critical Path manually, and emit the summary + Mermaid `flowchart LR`, noting that Node.js 20+ unlocks `--json` and the live `--serve` UI.
+3. For Work Tech-Tree, inspect the Linear MCP project/issue payloads directly, compute ready vs. blocked status and Critical Path manually, and emit the summary + Mermaid `flowchart LR`, noting that Node.js 22+ unlocks `--json` and the live `--serve` UI.
 
 ## CLI Reference (`scripts/cli.mjs`)
 
@@ -114,7 +114,7 @@ If `node` is unavailable or older than Node 20 (`node -v` fails or reports `< 20
 | :--- | :--- |
 | `--dir <path>` | Target consumer workspace directory (defaults to current working directory). |
 | `--work-graph <path>` | Path to canonical `work-graph` v1 JSON snapshot (prefer out-of-repo scratch path; watched live via `fs.watch` in `--serve`). |
-| `--linear-project <id\|slug\|name>` | Fetch live single Linear project directly via `LINEAR_API_KEY` (Node 20 native `fetch`). |
+| `--linear-project <id\|slug\|name>` | Fetch live single Linear project directly via `LINEAR_API_KEY` (Node 22 native `fetch`). |
 | `--linear-team <key\|name>` | Fetch all active Linear projects in a team directly via `LINEAR_API_KEY`. |
 | `--poll-ms <num>` | Live Linear polling interval in ms for `--serve` (default `30000`; validated integer `>= 5000`, or `0` to disable periodic polling). |
 | `--view <auto\|work\|pipeline>` | Select view mode (default `auto`: `work` if `--work-graph`/Linear is configured or a legacy read-only `docs/factory/work-graph.json` pre-exists, else `pipeline`). |

@@ -631,7 +631,7 @@ export async function fetchLinearGraph({
     );
   }
   if (typeof fetchImpl !== "function") {
-    throw new Error("Node.js 20+ native fetch is required for direct Linear GraphQL mode");
+    throw new Error("Node.js 22+ native fetch is required for direct Linear GraphQL mode");
   }
 
   const cleanKey = apiKey.trim();
