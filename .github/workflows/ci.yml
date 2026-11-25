@@ -17,6 +17,7 @@ jobs:
   verify:
     name: Verify (${{ matrix.os }} / Node ${{ matrix.node }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
@@ -37,12 +38,13 @@ jobs:
       - name: Run deterministic eval suite (skills, strict schemas, guards, tokens)
         run: node evals/run.mjs --ascii
       - name: Run zero-dependency runtime & security test suite
-        run: node --test tests/*.test.mjs
+        run: node --test --test-timeout=30000 tests/*.test.mjs
 
   release-tag-guard:
     name: Release Tag Version Parity
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0

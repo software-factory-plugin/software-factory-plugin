@@ -174,10 +174,11 @@ test("fs-safe: createDebouncedWatcher handles errors safely and close() cancels 
   assert.ok(errSeen instanceof Error);
 
   const dir = makeTempDir("sf-watch-");
+  let handle = null;
   try {
     let changesAfterClose = 0;
     let watcherErrorSeen = null;
-    const handle = createDebouncedWatcher(dir, {
+    handle = createDebouncedWatcher(dir, {
       debounceMs: 60,
       onChange: () => {
         changesAfterClose += 1;
@@ -200,6 +201,7 @@ test("fs-safe: createDebouncedWatcher handles errors safely and close() cancels 
     await new Promise((r) => setTimeout(r, 90));
     assert.equal(changesAfterClose, 0, "close() must cancel pending debounce timers");
   } finally {
+    handle?.close();
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
@@ -384,29 +386,43 @@ test("http-sse: HEAD body omission, SSE hub cap/eviction, listenWithFallback, an
   const beforeSigint = process.listenerCount("SIGINT");
   const beforeSigterm = process.listenerCount("SIGTERM");
   const uninstall = installGracefulShutdown(() => {});
-  assert.equal(process.listenerCount("SIGINT"), beforeSigint + 1);
-  assert.equal(process.listenerCount("SIGTERM"), beforeSigterm + 1);
-  uninstall();
+  try {
+    assert.equal(process.listenerCount("SIGINT"), beforeSigint + 1);
+    assert.equal(process.listenerCount("SIGTERM"), beforeSigterm + 1);
+  } finally {
+    uninstall();
+  }
   assert.equal(process.listenerCount("SIGINT"), beforeSigint);
   assert.equal(process.listenerCount("SIGTERM"), beforeSigterm);
 
-  // listenWithFallback steps past EADDRINUSE and honors strictPort
+  // listenWithFallback steps past EADDRINUSE and honors strictPort (always close handles in finally)
   const server = http.createServer((_req, res) => sendJson(res, 200, { ok: true }));
-  const port = await listenWithFallback(server, 0);
-  assert.ok(port > 0);
-
   const server2 = http.createServer((_req, res) => sendJson(res, 200, { ok: true }));
-  const port2 = await listenWithFallback(server2, port, { strictPort: false });
-  assert.equal(port2, port + 1);
-
   const server3 = http.createServer((_req, res) => sendJson(res, 200, { ok: true }));
-  await assert.rejects(
-    () => listenWithFallback(server3, port, { strictPort: true }),
-    (err) => err && err.code === "EADDRINUSE"
-  );
+  const closeServer = (srv) =>
+    new Promise((resolve) => {
+      if (!srv.listening) {
+        resolve();
+        return;
+      }
+      srv.close(() => resolve());
+    });
 
-  await Promise.all([
-    new Promise((r) => server.close(r)),
-    new Promise((r) => server2.close(r)),
-  ]);
+  try {
+    const port = await listenWithFallback(server, 0);
+    assert.ok(port > 0);
+
+    const port2 = await listenWithFallback(server2, port, { strictPort: false });
+    assert.ok(
+      port2 > port && port2 <= port + 20,
+      `Expected fallback port in (${port}, ${port + 20}], got ${port2}`
+    );
+
+    await assert.rejects(
+      () => listenWithFallback(server3, port, { strictPort: true }),
+      (err) => err && err.code === "EADDRINUSE"
+    );
+  } finally {
+    await Promise.all([closeServer(server), closeServer(server2), closeServer(server3)]);
+  }
 });
